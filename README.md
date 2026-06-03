@@ -1,2 +1,1 @@
-# Personal-Local-AI-Agent
-A lightweight AI agent desktop app supporting Anthropic, OpenAI, and local Ollama models — switchable without touching code. Clean, distraction-free UI. Multi-turn memory, streaming responses, tool use, and a one-click GitHub Pages download page.
+AI Agent is an open-source desktop application that lets you interact with any large language model through a single, consistent interface. Switch between Anthropic Claude, OpenAI GPT, or a locally hosted Ollama model from the sidebar — no code changes needed. Built for people who want a calm, focused tool without the noise of web-based AI chat products.
