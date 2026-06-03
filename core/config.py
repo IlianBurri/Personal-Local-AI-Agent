@@ -7,6 +7,10 @@ CONFIG_PATH = Path.home() / ".config" / "arca" / "config.json"
 DEFAULT_CONFIG = {
     "provider": None,
     "providers": {},
+    "web": {
+        "password_salt": None,
+        "password_hash": None,
+    },
 }
 
 

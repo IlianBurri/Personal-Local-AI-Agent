@@ -1,3 +1,4 @@
+import argparse
 import sys
 import os
 import json
@@ -17,6 +18,7 @@ except Exception:
 
 from core.config import load_config, save_config
 from core.clients import OpenAIClient, AnthropicClient, OllamaClient
+from ui.web_app import start_web_ui
 
 
 APP_BG = "#F5F4F0"
@@ -557,11 +559,36 @@ class MainWindow(QtWidgets.QMainWindow):
         QtWidgets.QMessageBox.warning(self, "Stream error", err)
 
 
-def main():
+def run_desktop_app():
     app = QtWidgets.QApplication(sys.argv)
     win = MainWindow()
     win.show()
     sys.exit(app.exec())
+
+
+def run_web_app(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = True):
+    server = start_web_ui(host=host, port=port, open_browser=open_browser)
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    finally:
+        server.server_close()
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Arca agent launcher")
+    parser.add_argument("--mode", choices=["web", "desktop"], default="web")
+    parser.add_argument("--host", default="127.0.0.1")
+    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--no-open-browser", action="store_true")
+    args = parser.parse_args()
+
+    if args.mode == "desktop":
+        run_desktop_app()
+        return
+
+    run_web_app(host=args.host, port=args.port, open_browser=not args.no_open_browser)
 
 
 if __name__ == "__main__":
