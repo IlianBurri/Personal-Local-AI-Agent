@@ -1,8 +1,11 @@
 from abc import ABC, abstractmethod
-from typing import Iterator, AsyncIterator, Dict, Any
+from typing import Iterator, AsyncIterator, Dict, Any, Optional, Callable
 import requests
 import json
 import os
+import time
+import random
+from requests.exceptions import RequestException
 
 
 class BaseLLMClient(ABC):
@@ -24,30 +27,49 @@ class OpenAIClient(BaseLLMClient):
 
     def stream_chat(self, messages, **kwargs):
         # messages: list of {role, content}
-        # Use streaming ChatCompletion interface
-        resp = self._openai.ChatCompletion.create(
-            model=self.model, messages=messages, stream=True, **kwargs
-        )
-        for chunk in resp:
-            # chunk is a dict-like with choices and deltas
+        # Use streaming ChatCompletion interface. Wrap in retry loop for transient errors.
+        max_retries = kwargs.pop("_retries", 3)
+        backoff_base = kwargs.pop("_backoff_base", 0.6)
+
+        attempt = 0
+        while True:
+            attempt += 1
             try:
-                if "choices" in chunk:
-                    for c in chunk["choices"]:
-                        delta = c.get("delta", {})
-                        text = delta.get("content")
-                        if text:
-                            yield text
-                else:
-                    # older clients may yield text directly
-                    text = chunk.get("text") if isinstance(chunk, dict) else str(chunk)
-                    if text:
-                        yield text
-            except Exception:
-                # fallback
-                try:
-                    yield str(chunk)
-                except Exception:
-                    continue
+                resp = self._openai.ChatCompletion.create(
+                    model=self.model, messages=messages, stream=True, **kwargs
+                )
+                for chunk in resp:
+                    # chunk is a dict-like with choices and deltas
+                    try:
+                        if isinstance(chunk, dict) and "choices" in chunk:
+                            for c in chunk["choices"]:
+                                delta = c.get("delta", {})
+                                text = delta.get("content") or delta.get("message")
+                                if text:
+                                    yield text
+                        else:
+                            # older clients may yield text directly or a dict with 'text'
+                            if isinstance(chunk, dict):
+                                text = chunk.get("text") or chunk.get("content")
+                                if text:
+                                    yield text
+                            else:
+                                yield str(chunk)
+                    except Exception:
+                        # best-effort fallback
+                        try:
+                            yield str(chunk)
+                        except Exception:
+                            continue
+                # finished successfully
+                break
+            except Exception as e:
+                # Only retry on likely transient errors
+                if attempt >= max_retries:
+                    raise
+                sleep = backoff_base * (2 ** (attempt - 1)) * (0.8 + random.random() * 0.4)
+                time.sleep(sleep)
+                continue
 
 
 class AnthropicClient(BaseLLMClient):
@@ -59,34 +81,64 @@ class AnthropicClient(BaseLLMClient):
         self.model = model
 
     def stream_chat(self, messages, **kwargs):
-        # Anthropic streaming via messages.stream if available
-        try:
-            # If the SDK supports messages.stream
-            stream = self.client.messages.stream(messages=messages, model=self.model, **kwargs)
-            for part in stream:
-                # part may be dict with 'content' or 'text'
-                text = None
-                if isinstance(part, dict):
-                    text = part.get("content") or part.get("text") or part.get("completion")
-                else:
-                    text = str(part)
-                if text:
-                    yield text
-            return
-        except Exception:
-            # Fallback to older completion API
-            prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+        # Anthropic streaming via messages.stream if available. Use retries for transient issues.
+        max_retries = kwargs.pop("_retries", 3)
+        backoff_base = kwargs.pop("_backoff_base", 0.6)
+
+        prompt = "\n".join([f"{m['role']}: {m['content']}" for m in messages])
+
+        attempt = 0
+        while True:
+            attempt += 1
             try:
-                for chunk in self.client.stream_completion(prompt=prompt, model=self.model, **kwargs):
-                    text = chunk.get("completion")
-                    if text:
-                        yield text
-            except Exception:
-                # final fallback: call non-streaming completion
-                resp = self.client.completions.create(prompt=prompt, model=self.model, **kwargs)
-                out = resp.get("completion") or resp.get("text") or ""
-                if out:
-                    yield out
+                # Try modern messages.stream API
+                try:
+                    stream = self.client.messages.stream(messages=messages, model=self.model, **kwargs)
+                    for part in stream:
+                        text = None
+                        if isinstance(part, dict):
+                            text = part.get("content") or part.get("text") or part.get("completion")
+                        else:
+                            text = str(part)
+                        if text:
+                            yield text
+                    return
+                except AttributeError:
+                    # older SDKs may not have messages.stream
+                    pass
+
+                # Try stream_completion API
+                try:
+                    for chunk in self.client.stream_completion(prompt=prompt, model=self.model, **kwargs):
+                        if isinstance(chunk, dict):
+                            text = chunk.get("completion") or chunk.get("text")
+                        else:
+                            text = str(chunk)
+                        if text:
+                            yield text
+                    return
+                except AttributeError:
+                    pass
+
+                # Final fallback: non-streaming completion
+                if hasattr(self.client, "completions"):
+                    resp = self.client.completions.create(prompt=prompt, model=self.model, **kwargs)
+                    out = None
+                    if isinstance(resp, dict):
+                        out = resp.get("completion") or resp.get("text") or ""
+                    else:
+                        out = str(resp)
+                    if out:
+                        yield out
+                    return
+                # If none of the above worked, raise
+                raise RuntimeError("No supported Anthropic streaming API available")
+            except Exception as e:
+                if attempt >= max_retries:
+                    raise
+                sleep = backoff_base * (2 ** (attempt - 1)) * (0.8 + random.random() * 0.4)
+                time.sleep(sleep)
+                continue
 
 
 class OllamaClient(BaseLLMClient):
