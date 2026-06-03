@@ -351,11 +351,11 @@ class MainWindow(QtWidgets.QMainWindow):
         key.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         form.addRow("Provider", prov)
         form.addRow("API Key", key)
-        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.Ok|QtWidgets.QDialogButtonBox.Cancel)
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
         form.addWidget(btns)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
-        if dlg.exec() == QtWidgets.QDialog.Accepted:
+        if dlg.exec() == QtWidgets.QDialog.DialogCode.Accepted:
             provider = prov.currentText()
             cfg = self.config
             cfg.setdefault("providers", {})[provider] = {"api_key": key.text().strip()}
