@@ -1,37 +1,48 @@
-# AI Agent (desktop)
+# Arca
 
-AI Agent is a lightweight desktop application that lets you connect to multiple LLM providers (OpenAI, Anthropic, local Ollama) via a unified interface. Switch providers from the UI without editing code.
+*Your models. Your machine. Your rules.*
 
-**This repository** contains a Python + PyQt6 prototype with modular LLM clients, a basic chat UI, and a GitHub Pages landing page.
+Arca is a lightweight desktop AI agent that connects to any LLM — OpenAI, Anthropic, or a local Ollama instance — through a single clean interface. Switch providers from the sidebar without touching code.
 
-**Config**: stored at `~/.config/aiagent/config.json`. The app prompts for provider configuration on first launch.
-
-## Quick start (Linux/macOS)
-
-Clone and setup:
+## Quick start
 
 ```bash
-git clone https://github.com/IlianBurri/Personal-Local-AI-Agent.git
-cd Personal-Local-AI-Agent
+git clone https://github.com/IlianBurri/arca.git
+cd arca
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-```
-
-Run the UI:
-
-```bash
-python3 -m ui.main
+python -m ui.main
 ```
 
 ## Provider setup
 
-On first launch you'll be prompted to choose a provider and enter an API key (for OpenAI or Anthropic) or a base URL (for Ollama). Keys are stored locally in `~/.config/aiagent/config.json` — never hardcoded into the app.
+On first launch Arca asks for your provider and API key. Everything is saved locally at `~/.config/arca/config.json` — nothing leaves your machine.
 
-## Packaging
+| Provider  | What you need          |
+|-----------|------------------------|
+| Anthropic | API key                |
+| OpenAI    | API key                |
+| Ollama    | Local instance running at `localhost:11434` |
 
-We plan to publish binaries using `PyInstaller`. See `docs/` for download links once releases are created.
+## Project structure
+arca/
+├── core/        # LLM clients (Anthropic, OpenAI, Ollama)
+├── ui/          # PyQt6 chat interface
+├── tools/       # Agent tools (file read/write, shell)
+├── docs/        # GitHub Pages landing page
+└── requirements.txt
+## Roadmap
+
+- [ ] Streaming responses
+- [ ] Conversation history
+- [ ] Tool use (file access, shell commands)
+- [ ] PyInstaller binary releases
 
 ## Contributing
 
-Contributions welcome. Please open issues or PRs. Follow standard GitHub flow: branch from `main`, create a descriptive commit message, and open a PR.
+PRs and issues welcome. Branch from `main`, write a clear commit message, open a PR.
+
+## License
+
+MIT
