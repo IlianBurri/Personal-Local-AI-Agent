@@ -109,21 +109,26 @@ class OllamaClient(BaseLLMClient):
             "prompt": "\n".join([f"{m['role']}: {m['content']}" for m in messages]),
             "stream": True,
         }
-        with requests.post(url, json=payload, stream=True, timeout=60) as r:
+        headers = {"User-Agent": "Arca-Agent/1.0"}
+        with requests.post(url, json=payload, stream=True, timeout=60, headers=headers) as r:
             r.raise_for_status()
-            # Ollama may send JSON lines
+            # Ollama may stream JSON lines or SSE-style 'data: ...' lines
             for line in r.iter_lines(decode_unicode=True):
                 if not line:
                     continue
-                try:
-                    data = json.loads(line)
-                except Exception:
-                    data = {"text": line}
-                # Ollama streams may include 'output' or 'response' fields
                 text = None
-                if isinstance(data, dict):
-                    text = data.get("text") or data.get("output") or data.get("response") or data.get("content")
-                else:
-                    text = str(data)
+                raw = line.strip()
+                # handle server-sent events lines like 'data: {...}'
+                if raw.startswith("data:"):
+                    raw = raw[len("data:"):].strip()
+                try:
+                    data = json.loads(raw)
+                    if isinstance(data, dict):
+                        text = data.get("text") or data.get("output") or data.get("response") or data.get("content")
+                    else:
+                        text = str(data)
+                except Exception:
+                    # not json, use raw
+                    text = raw
                 if text:
                     yield text
