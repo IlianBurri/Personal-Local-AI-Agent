@@ -2,8 +2,9 @@ import sys
 import os
 import json
 import time
+import threading
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 
 from PyQt6 import QtWidgets, QtCore, QtGui
 
@@ -80,7 +81,7 @@ class MessageWidget(QtWidgets.QWidget):
                         lbl = QtWidgets.QLabel(part.strip())
                         lbl.setWordWrap(True)
                         bubble_layout.addWidget(lbl)
-                else:
+                    else:
                     # code block
                     code = QtWidgets.QPlainTextEdit()
                     code.setPlainText(part)
@@ -102,9 +103,31 @@ class MessageWidget(QtWidgets.QWidget):
                     hb.addWidget(copy_btn)
                     bubble_layout.addLayout(hb)
         else:
-            lbl = QtWidgets.QLabel(self.content)
+            self.lbl = QtWidgets.QLabel(self.content)
+            self.lbl.setWordWrap(True)
+            bubble_layout.addWidget(self.lbl)
+
+        # For code blocks there's no single lbl; store reference to last code widget if needed
+        self._last_code_widget: Optional[QtWidgets.QPlainTextEdit] = None
+        for i in range(bubble_layout.count()):
+            w = bubble_layout.itemAt(i).widget()
+            if isinstance(w, QtWidgets.QPlainTextEdit):
+                self._last_code_widget = w
+
+    def append_text(self, tok: str):
+        """Append token to the last text area (label or code block)."""
+        if hasattr(self, "lbl") and self.lbl is not None:
+            # update label text
+            new_text = (self.lbl.text() or "") + tok
+            self.lbl.setText(new_text)
+        elif self._last_code_widget is not None:
+            txt = self._last_code_widget.toPlainText() + tok
+            self._last_code_widget.setPlainText(txt)
+        else:
+            # fallback: add a small label
+            lbl = QtWidgets.QLabel(tok)
             lbl.setWordWrap(True)
-            bubble_layout.addWidget(lbl)
+            self.layout().addWidget(lbl)
 
         # style
         if self.role == "user":
@@ -177,6 +200,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self.model_combo = QtWidgets.QComboBox()
         left_layout.addWidget(self.provider_combo)
         left_layout.addWidget(self.model_combo)
+        self.ollama_status = QtWidgets.QLabel("")
+        self.ollama_status.setStyleSheet("color:#666;font-size:12px")
+        left_layout.addWidget(self.ollama_status)
         h.addWidget(left)
 
         # Center chat
@@ -236,6 +262,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # initial populate
         self.load_conversations_list()
 
+        # start Ollama autodiscovery in background
+        threading.Thread(target=self._discover_ollama, daemon=True).start()
+
         # First-run prompt if no providers configured
         if not self.config.get("providers"):
             self.first_run_dialog()
@@ -283,6 +312,47 @@ class MainWindow(QtWidgets.QMainWindow):
             item = QtWidgets.QListWidgetItem(title)
             item.setData(QtCore.Qt.ItemDataRole.UserRole, str(f))
             self.conv_list.addItem(item)
+        # ensure Ollama status cleared until checked
+        self.ollama_status.setText("")
+
+    def _discover_ollama(self):
+        # determine base URL from config
+        conf = self.config.get("providers", {})
+        base = conf.get("ollama", {}).get("base_url", "http://localhost:11434")
+        client = OllamaClient(base_url=base)
+        try:
+            tags = client.list_models()
+            # normalize into list of model names
+            models = []
+            if isinstance(tags, dict):
+                # maybe {'models': [...]}
+                for v in tags.get("models", []) or tags.get("tags", []):
+                    if isinstance(v, str):
+                        models.append(v)
+                    elif isinstance(v, dict):
+                        name = v.get("name") or v.get("model")
+                        if name:
+                            models.append(name)
+            elif isinstance(tags, list):
+                for item in tags:
+                    if isinstance(item, str):
+                        models.append(item)
+                    elif isinstance(item, dict):
+                        name = item.get("name") or item.get("model") or item.get("tag")
+                        if name:
+                            models.append(name)
+            # update UI on main thread
+            def apply_models():
+                self.model_combo.clear()
+                if models:
+                    self.model_combo.addItems(models)
+                    self.ollama_status.setText(f"Ollama: {len(models)} models")
+                else:
+                    self.ollama_status.setText("Ollama: no models")
+            QtCore.QTimer.singleShot(0, apply_models)
+        except Exception:
+            # offline - set label
+            QtCore.QTimer.singleShot(0, lambda: self.ollama_status.setText("Ollama offline"))
 
     def load_selected_conversation(self):
         items = self.conv_list.selectedItems()
@@ -311,7 +381,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def append_and_save(self, role: str, content: str):
         # append to UI and save to current conv
-        self.chat_area.add_message(role, content)
+        widget = self.chat_area.add_message(role, content)
         if not self.current_conv_path:
             # create new
             fname = safe_filename("conv")
@@ -328,6 +398,7 @@ class MainWindow(QtWidgets.QMainWindow):
             json.dump(data, fh)
         # refresh list title
         self.load_conversations_list()
+        return widget
 
     def send_message(self):
         text = self.input_edit.text().strip()
@@ -382,8 +453,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self.worker.error.connect(self.on_error)
         self.worker.finished.connect(self.thread.quit)
         self.thread.started.connect(self.worker.run)
-        # reserve assistant message in UI and storage
-        self.append_and_save("assistant", "")
+        # reserve assistant message in UI and storage and keep reference to widget
+        self.current_assistant_widget = self.append_and_save("assistant", "")
         self.thread.start()
 
     def on_token(self, tok: str):
@@ -394,7 +465,15 @@ class MainWindow(QtWidgets.QMainWindow):
         # We will simply append a plain QLabel at end for streaming
         # Find last widget and append text
         # Naive approach: add a small label for streaming text
-        w = self.chat_area.add_message("assistant", tok)
+        # update in-place the reserved assistant widget
+        if hasattr(self, "current_assistant_widget") and self.current_assistant_widget is not None:
+            try:
+                self.current_assistant_widget.append_text(tok)
+            except Exception:
+                # fallback to adding a message
+                self.chat_area.add_message("assistant", tok)
+        else:
+            w = self.chat_area.add_message("assistant", tok)
         # Also append to current_conv file last message
         if not self.current_conv_path:
             return
