@@ -1,0 +1,26 @@
+__pycache__/
+dist/
+build/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.venv/
+*.egg-info/
+dist/
+release/
+dist/
+*.spec
+*.log
+*.sqlite3
+*.db
+secrets.json
+/.pytest_cache/
+
+# PyInstaller
+*.manifest
+*.spec
+
+# macOS
+.DS_Store
