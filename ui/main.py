@@ -7,6 +7,13 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 
 from PyQt6 import QtWidgets, QtCore, QtGui
+try:
+    from pygments import highlight
+    from pygments.lexers import get_lexer_by_name, guess_lexer, TextLexer
+    from pygments.formatters import HtmlFormatter
+    PYGMENTS_AVAILABLE = True
+except Exception:
+    PYGMENTS_AVAILABLE = False
 
 from core.config import load_config, save_config
 from core.clients import OpenAIClient, AnthropicClient, OllamaClient
@@ -72,36 +79,92 @@ class MessageWidget(QtWidgets.QWidget):
 
         # Determine if content contains code block (```)
         if "```" in self.content:
-            # extract code between triple backticks if present
             parts = self.content.split("```")
-            # Show text before and after, and code blocks as monospace widgets
             for i, part in enumerate(parts):
                 if i % 2 == 0:
                     if part.strip():
                         lbl = QtWidgets.QLabel(part.strip())
                         lbl.setWordWrap(True)
                         bubble_layout.addWidget(lbl)
+                else:
+                    # part may start with a language hint like "python\n..."
+                    lang = None
+                    code_text = part
+                    if "\n" in part:
+                        first, rest = part.split("\n", 1)
+                        if first.isalpha() and len(first) <= 20:
+                            lang = first.strip()
+                            code_text = rest
+
+                    if PYGMENTS_AVAILABLE:
+                        try:
+                            lexer = None
+                            if lang:
+                                try:
+                                    lexer = get_lexer_by_name(lang)
+                                except Exception:
+                                    lexer = None
+                            if lexer is None:
+                                try:
+                                    lexer = guess_lexer(code_text)
+                                except Exception:
+                                    lexer = TextLexer()
+                            formatter = HtmlFormatter(noclasses=True, style="default")
+                            html = highlight(code_text, lexer, formatter)
+                            textedit = QtWidgets.QTextEdit()
+                            textedit.setReadOnly(True)
+                            textedit.setHtml(html)
+                            textedit.setMaximumHeight(300)
+                            copy_btn = QtWidgets.QPushButton("Copy")
+                            def make_copy(te=textedit):
+                                def _():
+                                    clipboard = QtWidgets.QApplication.clipboard()
+                                    clipboard.setText(te.toPlainText())
+                                return _
+                            copy_btn.clicked.connect(make_copy())
+                            hb = QtWidgets.QHBoxLayout()
+                            hb.addWidget(textedit)
+                            hb.addWidget(copy_btn)
+                            bubble_layout.addLayout(hb)
+                        except Exception:
+                            # fallback to plain text viewer
+                            code = QtWidgets.QPlainTextEdit()
+                            code.setPlainText(code_text)
+                            code.setReadOnly(True)
+                            font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont)
+                            font.setPointSize(11)
+                            code.setFont(font)
+                            code.setMaximumHeight(200)
+                            copy_btn = QtWidgets.QPushButton("Copy")
+                            def make_copy2(txt_widget=code):
+                                def _():
+                                    clipboard = QtWidgets.QApplication.clipboard()
+                                    clipboard.setText(txt_widget.toPlainText())
+                                return _
+                            copy_btn.clicked.connect(make_copy2())
+                            hb = QtWidgets.QHBoxLayout()
+                            hb.addWidget(code)
+                            hb.addWidget(copy_btn)
+                            bubble_layout.addLayout(hb)
                     else:
-                    # code block
-                    code = QtWidgets.QPlainTextEdit()
-                    code.setPlainText(part)
-                    code.setReadOnly(True)
-                    font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont)
-                    font.setPointSize(11)
-                    code.setFont(font)
-                    code.setMaximumHeight(200)
-                    # copy button
-                    copy_btn = QtWidgets.QPushButton("Copy")
-                    def make_copy(txt_widget=code):
-                        def _():
-                            clipboard = QtWidgets.QApplication.clipboard()
-                            clipboard.setText(txt_widget.toPlainText())
-                        return _
-                    copy_btn.clicked.connect(make_copy())
-                    hb = QtWidgets.QHBoxLayout()
-                    hb.addWidget(code)
-                    hb.addWidget(copy_btn)
-                    bubble_layout.addLayout(hb)
+                        code = QtWidgets.QPlainTextEdit()
+                        code.setPlainText(code_text)
+                        code.setReadOnly(True)
+                        font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont)
+                        font.setPointSize(11)
+                        code.setFont(font)
+                        code.setMaximumHeight(200)
+                        copy_btn = QtWidgets.QPushButton("Copy")
+                        def make_copy3(txt_widget=code):
+                            def _():
+                                clipboard = QtWidgets.QApplication.clipboard()
+                                clipboard.setText(txt_widget.toPlainText())
+                            return _
+                        copy_btn.clicked.connect(make_copy3())
+                        hb = QtWidgets.QHBoxLayout()
+                        hb.addWidget(code)
+                        hb.addWidget(copy_btn)
+                        bubble_layout.addLayout(hb)
         else:
             self.lbl = QtWidgets.QLabel(self.content)
             self.lbl.setWordWrap(True)
@@ -113,6 +176,16 @@ class MessageWidget(QtWidgets.QWidget):
             w = bubble_layout.itemAt(i).widget()
             if isinstance(w, QtWidgets.QPlainTextEdit):
                 self._last_code_widget = w
+
+        # style
+        if self.role == "user":
+            bubble.setStyleSheet(f"background:{ACCENT};color:#fff;border:1px solid {BORDER}")
+            layout.addStretch()
+            layout.addWidget(bubble, 0)
+        else:
+            bubble.setStyleSheet(f"background:#ffffff;color:{TEXT_COLOR};border:1px solid {BORDER}")
+            layout.addWidget(bubble, 0)
+            layout.addStretch()
 
     def append_text(self, tok: str):
         """Append token to the last text area (label or code block)."""
@@ -128,16 +201,6 @@ class MessageWidget(QtWidgets.QWidget):
             lbl = QtWidgets.QLabel(tok)
             lbl.setWordWrap(True)
             self.layout().addWidget(lbl)
-
-        # style
-        if self.role == "user":
-            bubble.setStyleSheet(f"background:{ACCENT};color:#fff;border:1px solid {BORDER}")
-            layout.addStretch()
-            layout.addWidget(bubble, 0)
-        else:
-            bubble.setStyleSheet(f"background:#ffffff;color:{TEXT_COLOR};border:1px solid {BORDER}")
-            layout.addWidget(bubble, 0)
-            layout.addStretch()
 
 
 class ChatCenter(QtWidgets.QScrollArea):

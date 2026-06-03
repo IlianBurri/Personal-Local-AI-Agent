@@ -1,108 +1,138 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>AI Agent</title>
-    <link rel="stylesheet" href="style.css" />
-  </head>
-  <body>
-    <div class="wrap">
-      <div class="top">
-        <div class="brand">
-          <div class="logo" aria-hidden="true">
-            <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="2" y="2" width="20" height="20" rx="4" fill="#FFFFFF" />
-              <path d="M6 12h12" stroke="#4A6FA5" stroke-width="1.8" stroke-linecap="round" />
-              <path d="M6 8h12" stroke="#A9C1E4" stroke-width="1.2" stroke-linecap="round" />
-            </svg>
-          </div>
-          <div>
-            <div class="title">Arca</div>
-            <div class="subtitle">Your models. Your machine. Your rules.</div>
-          </div>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Arca — Your models. Your machine. Your rules.</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <nav>
+    <div class="nav-inner">
+      <a href="/" class="wordmark">arca</a>
+      <div class="nav-links">
+        <a href="#features">features</a>
+        <a href="#install">install</a>
+        <a href="https://github.com/IlianBurri/arca" target="_blank">github ↗</a>
+      </div>
+      <a class="btn-nav" href="https://github.com/IlianBurri/arca/releases/latest">Download</a>
+    </div>
+  </nav>
+
+  <main>
+
+    <section class="hero">
+      <div class="hero-eyebrow">open source · local-first · multi-provider</div>
+      <h1>Your models.<br><em>Your machine.</em><br>Your rules.</h1>
+      <p class="hero-sub">A desktop AI agent that talks to any LLM — Anthropic, OpenAI, or Ollama running locally. Switch providers from the sidebar. No code changes needed.</p>
+      <div class="hero-actions">
+        <a class="btn-primary" href="https://github.com/IlianBurri/arca/releases/latest">Download for Linux</a>
+        <a class="btn-secondary" href="#install">or clone & run</a>
+      </div>
+      <div class="hero-meta">
+        <span><span class="dot"></span>v0.1.0</span>
+        <span>Linux · macOS · Windows</span>
+        <span>Python + PyQt6</span>
+      </div>
+    </section>
+
+    <section class="mockup-wrap">
+      <div class="mockup">
+        <div class="mockup-bar">
+          <span class="dot-red"></span>
+          <span class="dot-yellow"></span>
+          <span class="dot-green"></span>
+          <span class="mockup-title">arca — claude-3-5-sonnet</span>
         </div>
-        <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
-          <a class="btn btn-primary" id="downloadBtn" href="https://github.com/IlianBurri/arca/releases/latest">Download</a>
+        <div class="mockup-body">
+          <aside class="mock-sidebar">
+            <div class="mock-newchat">+ New chat</div>
+            <div class="mock-conv active">Summarise meeting notes</div>
+            <div class="mock-conv">Draft release email</div>
+            <div class="mock-conv">Debug Python script</div>
+            <div class="mock-provider">
+              <div class="mock-provider-label">Provider</div>
+              <div class="mock-provider-val">Anthropic · claude-3-5-sonnet</div>
+            </div>
+          </aside>
+          <div class="mock-chat">
+            <div class="mock-msgs">
+              <div class="mock-msg user">Summarise the Q2 meeting notes in three bullet points.</div>
+              <div class="mock-msg assistant">
+                <div class="mock-typing">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            </div>
+            <div class="mock-input">
+              <div class="mock-input-field">Ask anything…</div>
+              <div class="mock-send">↑</div>
+            </div>
+          </div>
         </div>
       </div>
+    </section>
 
-      <section class="hero">
-        <div class="lead">
-          <h1>Arca — Your models. Your machine. Your rules.</h1>
-          <p class="lead-desc">A local-first, multi-provider desktop agent. Configure providers, switch models, and keep your data local when you need to.</p>
-          <div class="cta-row">
-            <a class="btn btn-primary" href="https://github.com/IlianBurri/arca/releases/latest">Download latest</a>
-            <a class="btn btn-ghost" href="#get-started">Clone & run</a>
-            <a class="btn btn-ghost" href="#features">Features</a>
-          </div>
-          <div style="margin-top:18px;display:flex;gap:12px;align-items:center">
-            <div style="display:flex;flex-direction:column">
-              <small class="muted">Latest release</small>
-              <strong>v0.1.0</strong>
-            </div>
-            <div style="display:flex;flex-direction:column">
-              <small class="muted">Platforms</small>
-              <strong>Linux · macOS · Windows</strong>
-            </div>
-          </div>
+    <section id="features" class="features-section">
+      <div class="section-label">what it does</div>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-num">01</div>
+          <h3>Any provider</h3>
+          <p>Anthropic, OpenAI, or a local Ollama instance. Configured once, switchable anytime from the sidebar dropdown.</p>
         </div>
-        <aside class="screenshot">
-          <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch">
-            <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #D0CFC8;min-height:220px;display:flex;align-items:center;justify-content:center">
-              <!-- Placeholder image -->
-              <svg width="320" height="160" viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <rect width="320" height="160" rx="8" fill="#F5F6F8" stroke="#E6E9EE"/>
-                <g fill="#4A6FA5" opacity="0.9"><rect x="14" y="18" width="60" height="24" rx="4"/></g>
-                <text x="100" y="60" fill="#333" font-size="14">Arca UI — conversation thread (placeholder)</text>
-              </svg>
-            </div>
-            <div style="font-size:13px;color:#555">Screenshot placeholder — real screenshots will appear here in releases</div>
-          </div>
-        </aside>
-      </section>
-
-      <section id="features" class="section">
-        <div class="features">
-          <div class="feature">
-            <h4>Multi-provider</h4>
-            <div class="muted">Connect to OpenAI, Anthropic, or a local Ollama instance with a unified interface.</div>
-          </div>
-          <div class="feature">
-            <h4>Local-first</h4>
-            <div class="muted">Run models on your machine via Ollama, keeping data private and performant.</div>
-          </div>
-          <div class="feature">
-            <h4>Clean UI</h4>
-            <div class="muted">A calm, focused interface built for writing and conversation — no distractions.</div>
-          </div>
+        <div class="feature-card">
+          <div class="feature-num">02</div>
+          <h3>Stays local</h3>
+          <p>API keys live in <code>~/.config/arca/config.json</code> — never hardcoded, never sent anywhere they shouldn't go.</p>
         </div>
-      </section>
+        <div class="feature-card">
+          <div class="feature-num">03</div>
+          <h3>Streaming output</h3>
+          <p>Responses arrive token by token. No waiting for the full reply — the interface stays live as the model writes.</p>
+        </div>
+        <div class="feature-card">
+          <div class="feature-num">04</div>
+          <h3>Focused UI</h3>
+          <p>A calm, distraction-free layout. Sidebar for history, centre for chat, right panel for system prompt and controls.</p>
+        </div>
+      </div>
+    </section>
 
-      <section id="get-started" class="section">
-        <h3>Clone & run</h3>
-        <pre><code>git clone https://github.com/IlianBurri/arca.git
+    <section id="install" class="install-section">
+      <div class="section-label">get started</div>
+      <div class="install-grid">
+        <div class="install-option">
+          <h3>Download binary</h3>
+          <p>Grab the latest release for your platform. No Python installation required.</p>
+          <a class="btn-primary" href="https://github.com/IlianBurri/arca/releases/latest">Download latest release ↗</a>
+        </div>
+        <div class="install-divider">or</div>
+        <div class="install-option">
+          <h3>Clone &amp; run</h3>
+          <p>Run from source in a virtual environment.</p>
+          <pre><code>git clone https://github.com/IlianBurri/arca.git
 cd arca
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python3 -m ui.main</code></pre>
-      </section>
+        </div>
+      </div>
+    </section>
 
-      <footer>
-        <p>Hosted on GitHub Pages — <a href="https://github.com/IlianBurri/arca">repo</a></p>
-      </footer>
+  </main>
+
+  <footer>
+    <div class="footer-inner">
+      <span class="wordmark">arca</span>
+      <span>MIT licence · <a href="https://github.com/IlianBurri/arca">IlianBurri/arca</a> · hosted on GitHub Pages</span>
     </div>
+  </footer>
 
-    <script>
-      // Smooth scroll for anchors
-      document.querySelectorAll('a[href^="#"]').forEach(a=>{
-        a.addEventListener('click', e=>{
-          e.preventDefault();
-          const t = document.querySelector(a.getAttribute('href'));
-          if(t) t.scrollIntoView({behavior:'smooth'});
-        });
-      });
-    </script>
-  </body>
+</body>
 </html>
