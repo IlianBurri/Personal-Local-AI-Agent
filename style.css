@@ -1,4 +1,3 @@
-/* ─── Reset & Base ────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 :root {
@@ -311,11 +310,23 @@ h1 em {
   border-bottom-left-radius: 2px;
 }
 
+.mock-msg code {
+  font-family: var(--mono);
+  font-size: 12px;
+  background: rgba(0,0,0,0.08);
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
 .mock-typing {
   display: flex;
   gap: 5px;
   align-items: center;
-  padding: 2px 0;
+  padding: 10px 14px;
+  background: #ECEAE4;
+  border-radius: 8px;
+  border-bottom-left-radius: 2px;
+  align-self: flex-start;
 }
 
 .mock-typing span {
@@ -516,3 +527,4 @@ footer {
   .hero { padding: 64px 20px 48px; }
   .mockup-wrap, .features-section, .install-section { padding: 0 20px; }
 }
+
