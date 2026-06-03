@@ -11,7 +11,6 @@
       <div class="top">
         <div class="brand">
           <div class="logo" aria-hidden="true">
-            <!-- simple svg mark -->
             <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <rect x="2" y="2" width="20" height="20" rx="4" fill="#FFFFFF" />
               <path d="M6 12h12" stroke="#4A6FA5" stroke-width="1.8" stroke-linecap="round" />
@@ -24,46 +23,32 @@
           </div>
         </div>
         <div style="margin-left:auto;display:flex;gap:10px;align-items:center">
-          <a class="btn btn-primary" id="downloadBtn" href="https://github.com/IlianBurri/Personal-Local-AI-Agent/releases/latest">Download</a>
-          <button class="btn btn-ghost" id="demoToggle">Quick demo</button>
+          <a class="btn btn-primary" id="downloadBtn" href="https://github.com/IlianBurri/arca/releases/latest">Download</a>
         </div>
       </div>
 
       <section class="hero">
-          <div class="lead">
+        <div class="lead">
           <h1>Arca — Your models. Your machine. Your rules.</h1>
-          <p class="lead-desc">Configure providers, switch models, and interact with your preferred LLM — locally or hosted. Built with Python + PyQt6 for a focused, offline-capable experience.</p>
+          <p class="lead-desc">A local-first, multi-provider desktop agent. Configure providers, switch models, and keep your data local when you need to.</p>
           <div class="cta-row">
-            <a class="btn btn-primary" href="https://github.com/IlianBurri/Personal-Local-AI-Agent/releases/latest">Download latest</a>
+            <a class="btn btn-primary" href="https://github.com/IlianBurri/arca/releases/latest">Download latest</a>
             <a class="btn btn-ghost" href="#get-started">Clone & run</a>
             <a class="btn btn-ghost" href="#features">Features</a>
           </div>
-          <div class="section">
-            <h3>Live preview</h3>
-            <p class="muted">Small interactive preview of the UI and workflows.</p>
-            <div style="margin-top:12px;">
-              <label for="providerSelect">Provider preview</label>
-              <select id="providerSelect">
-                <option>OpenAI — gpt-4o</option>
-                <option>Anthropic — claude-3-5-sonnet</option>
-                <option>Ollama — local/llama2</option>
-              </select>
-            </div>
-          </div>
         </div>
         <aside class="screenshot">
-          <!-- lightweight vector screenshot -->
-          <svg viewBox="0 0 800 520" role="img" aria-label="app screenshot">
-            <rect x="0" y="0" width="800" height="520" rx="10" fill="#FFFFFF" stroke="#D0CFC8" />
-            <rect x="18" y="18" width="240" height="484" rx="8" fill="#F8F9FB" />
-            <rect x="270" y="18" width="512" height="360" rx="8" fill="#FBFBFC" />
-            <rect x="270" y="394" width="512" height="108" rx="8" fill="#fff" />
-            <g fill="#4A6FA5" opacity="0.9"><circle cx="292" cy="40" r="6"/></g>
-            <text x="292" y="80" font-size="18" fill="#333">Conversation — AI Agent</text>
-            <rect x="300" y="110" width="460" height="38" rx="6" fill="#f2f6fb" stroke="#E6EDF8"/>
-            <text x="320" y="135" font-size="13" fill="#666">Assistant: Hello — this is a streaming response preview...</text>
-            <rect x="286" y="464" width="440" height="28" rx="6" fill="#fff" stroke="#D0CFC8"/>
-          </svg>
+          <div style="display:flex;flex-direction:column;gap:8px;align-items:stretch">
+            <div style="background:#fff;border-radius:8px;padding:12px;border:1px solid #D0CFC8;min-height:220px;display:flex;align-items:center;justify-content:center">
+              <!-- Placeholder image -->
+              <svg width="320" height="160" viewBox="0 0 320 160" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect width="320" height="160" rx="8" fill="#F5F6F8" stroke="#E6E9EE"/>
+                <g fill="#4A6FA5" opacity="0.9"><rect x="14" y="18" width="60" height="24" rx="4"/></g>
+                <text x="100" y="60" fill="#333" font-size="14">Arca UI — conversation thread (placeholder)</text>
+              </svg>
+            </div>
+            <div style="font-size:13px;color:#555">Screenshot placeholder — real screenshots will appear here in releases</div>
+          </div>
         </aside>
       </section>
 
@@ -71,23 +56,23 @@
         <div class="features">
           <div class="feature">
             <h4>Multi-provider</h4>
-            <div class="muted">Switch between OpenAI, Anthropic, or a local Ollama instance without changing code.</div>
+            <div class="muted">Connect to OpenAI, Anthropic, or a local Ollama instance with a unified interface.</div>
           </div>
           <div class="feature">
             <h4>Local-first</h4>
-            <div class="muted">Run models on your machine via Ollama alongside hosted providers.</div>
+            <div class="muted">Run models on your machine via Ollama, keeping data private and performant.</div>
           </div>
           <div class="feature">
             <h4>Clean UI</h4>
-            <div class="muted">A calm, focused interface with tools for file access, shell execution, and search.</div>
+            <div class="muted">A calm, focused interface built for writing and conversation — no distractions.</div>
           </div>
         </div>
       </section>
 
       <section id="get-started" class="section">
         <h3>Clone & run</h3>
-        <pre><code>git clone https://github.com/IlianBurri/Personal-Local-AI-Agent.git
-cd Personal-Local-AI-Agent
+        <pre><code>git clone https://github.com/IlianBurri/arca.git
+cd arca
 python3 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
@@ -95,18 +80,12 @@ python3 -m ui.main</code></pre>
       </section>
 
       <footer>
-        <p>Hosted on GitHub Pages — <a href="https://ilianburri.github.io/arca/">repo</a></p>
+        <p>Hosted on GitHub Pages — <a href="https://github.com/IlianBurri/arca">repo</a></p>
       </footer>
     </div>
 
     <script>
-      // Small interactivity: demo toggle copies a small snippet
-      document.getElementById('demoToggle').addEventListener('click', function(){
-        const sel = document.getElementById('providerSelect');
-        alert('Provider preview: ' + sel.value + '\nOpen the app to try it live.');
-      });
-
-      // Smooth scroll for anchor links
+      // Smooth scroll for anchors
       document.querySelectorAll('a[href^="#"]').forEach(a=>{
         a.addEventListener('click', e=>{
           e.preventDefault();
