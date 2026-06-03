@@ -2,7 +2,7 @@ import json
 import os
 from pathlib import Path
 
-CONFIG_PATH = Path.home() / ".config" / "aiagent" / "config.json"
+CONFIG_PATH = Path.home() / ".config" / "arca" / "config.json"
 
 DEFAULT_CONFIG = {
     "provider": None,
