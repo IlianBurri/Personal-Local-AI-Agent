@@ -1,58 +1,76 @@
-# Arca
+# arca
 
-*Your models. Your machine. Your rules.*
+> Your models. Your machine. Your rules.
 
-Arca is a lightweight desktop AI agent that connects to any LLM — OpenAI, Anthropic, or a local Ollama instance — through a single clean interface. Switch providers from the sidebar without touching code.
+A lightweight desktop AI agent built with Python + PyQt6. Connect to Anthropic, OpenAI, or a local Ollama instance — switchable without touching code.
 
-Arca now also starts in a local browser UI by default. The web UI includes a local login screen, saved conversations, and a dark/light theme toggle.
+![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)
+![PyQt6](https://img.shields.io/badge/UI-PyQt6-green?style=flat-square)
+![License](https://img.shields.io/badge/license-MIT-lightgrey?style=flat-square)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20macOS%20%7C%20Windows-informational?style=flat-square)
+
+---
+
+## Features
+
+- **Multi-provider** — Anthropic, OpenAI, and local Ollama in one app
+- **Local-first** — run models entirely on your machine via Ollama
+- **Streaming responses** — real-time output as the model generates
+- **Multi-turn memory** — full conversation context per session
+- **Tool use** — extensible tool support via the `tools/` module
+- **Clean UI** — distraction-free chat interface, no Electron, no bloat
+
+---
 
 ## Quick start
+
+**Requirements:** Python 3.10+
 
 ```bash
 git clone https://github.com/IlianBurri/arca.git
 cd arca
 python3 -m venv .venv
-source .venv/bin/activate
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python -m ui.main
+python3 -m ui.main
 ```
 
-To force the old desktop window instead of the browser UI, run:
+On first launch, arca will prompt you to configure a provider.
 
-```bash
-python -m ui.main --mode desktop
-```
+---
 
-## Provider setup
+## Providers
 
-On first launch Arca asks for your provider and API key. Everything is saved locally at `~/.config/arca/config.json` — nothing leaves your machine.
+| Provider  | Requires             |
+|-----------|----------------------|
+| Anthropic | API key              |
+| OpenAI    | API key              |
+| Ollama    | Local Ollama install |
 
-The browser UI also asks you to create a local password the first time you open it.
+Provider config is stored in `~/.config/arca/config.json`.
 
-| Provider  | What you need          |
-|-----------|------------------------|
-| Anthropic | API key                |
-| OpenAI    | API key                |
-| Ollama    | Local instance running at `localhost:11434` |
+---
 
 ## Project structure
+
+```
 arca/
-├── core/        # LLM clients (Anthropic, OpenAI, Ollama)
+├── core/        # Config, provider management
 ├── ui/          # PyQt6 chat interface
-├── tools/       # Agent tools (file read/write, shell)
+├── tools/       # Tool definitions for LLM tool use
 ├── docs/        # GitHub Pages landing page
 └── requirements.txt
-## Roadmap
+```
 
-- [ ] Streaming responses
-- [ ] Conversation history
-- [ ] Tool use (file access, shell commands)
-- [ ] PyInstaller binary releases
+---
 
 ## Contributing
 
-PRs and issues welcome. Branch from `main`, write a clear commit message, open a PR.
+PRs and issues welcome. If you find a bug or want a feature, [open an issue](https://github.com/IlianBurri/arca/issues).
 
-## License
+---
 
-MIT
+## Links
+
+- **Website:** [ilianburri.github.io/arca](https://ilianburri.github.io/arca/)
+- **Releases:** [github.com/IlianBurri/arca/releases](https://github.com/IlianBurri/arca/releases)
