@@ -149,13 +149,20 @@ class MessageWidget(QtWidgets.QWidget):
                             hb.addWidget(copy_btn)
                             bubble_layout.addLayout(hb)
                     else:
+<<<<<<< HEAD
                         code = QtWidgets.QPlainTextEdit()
                         code.setPlainText(code_text)
+=======
+                        # code block
+                        code = QtWidgets.QPlainTextEdit()
+                        code.setPlainText(part)
+>>>>>>> ef21443 (fix: config recursion bug and PyQt6 enum compatibility)
                         code.setReadOnly(True)
                         font = QtGui.QFontDatabase.systemFont(QtGui.QFontDatabase.SystemFont.FixedFont)
                         font.setPointSize(11)
                         code.setFont(font)
                         code.setMaximumHeight(200)
+<<<<<<< HEAD
                         copy_btn = QtWidgets.QPushButton("Copy")
                         def make_copy3(txt_widget=code):
                             def _():
@@ -167,6 +174,20 @@ class MessageWidget(QtWidgets.QWidget):
                         hb.addWidget(code)
                         hb.addWidget(copy_btn)
                         bubble_layout.addLayout(hb)
+=======
+                        # copy button
+                        copy_btn = QtWidgets.QPushButton("Copy")
+                    def make_copy(txt_widget=code):
+                        def _():
+                            clipboard = QtWidgets.QApplication.clipboard()
+                            clipboard.setText(txt_widget.toPlainText())
+                        return _
+                    copy_btn.clicked.connect(make_copy())
+                    hb = QtWidgets.QHBoxLayout()
+                    hb.addWidget(code)
+                    hb.addWidget(copy_btn)
+                    bubble_layout.addLayout(hb)
+>>>>>>> ef21443 (fix: config recursion bug and PyQt6 enum compatibility)
         else:
             self.lbl = QtWidgets.QLabel(self.content)
             self.lbl.setWordWrap(True)
@@ -353,7 +374,11 @@ class MainWindow(QtWidgets.QMainWindow):
         key.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         form.addRow("Provider", prov)
         form.addRow("API Key", key)
+<<<<<<< HEAD
         btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+=======
+        btns = QtWidgets.QDialogButtonBox(QtWidgets.QDialogButtonBox.StandardButton.Ok|QtWidgets.QDialogButtonBox.StandardButton.Cancel)
+>>>>>>> ef21443 (fix: config recursion bug and PyQt6 enum compatibility)
         form.addWidget(btns)
         btns.accepted.connect(dlg.accept)
         btns.rejected.connect(dlg.reject)
