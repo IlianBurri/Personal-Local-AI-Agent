@@ -9,7 +9,7 @@ if str(root_dir) not in sys.path:
 
 try:
     print("==================================================")
-    print("        ODYSSEUS CORE CORE PIPELINE INITIALIZED   ")
+    print("        ARCA CORE CORE PIPELINE INITIALIZED   ")
     print("==================================================")
     
     from ui.web_app import start_web_ui
