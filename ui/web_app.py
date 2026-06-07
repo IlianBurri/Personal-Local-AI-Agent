@@ -331,29 +331,58 @@ class ArcaWebHandler(BaseHTTPRequestHandler):
             conversation = load_conversation(conversation_path)
             conversation.setdefault("messages", []).append({"role": "user", "content": message})
 
-            client = _build_client(self.server.config, provider, model)
-            messages = _build_messages(conversation, system_prompt)
             try:
-                response_text = "".join(
-                    client.stream_chat(messages, temperature=temperature, max_tokens=max_tokens)
-                ).strip()
-            except Exception as exc:
-                return _json_response(self, {"ok": False, "error": str(exc)}, 500)
+                client = _build_client(self.server.config, provider, model)
+                messages = _build_messages(conversation, system_prompt)
+                
+                # Hier schalten wir auf HTTP-Streaming um (Server-Sent Events)
+                self.send_response(200)
+                self.send_header("Content-Type", "text/event-stream; charset=utf-8")
+                self.send_header("Cache-Control", "no-cache")
+                self.send_header("Connection", "keep-alive")
+                self.end_headers()
 
-            conversation["messages"].append({"role": "assistant", "content": response_text})
-            if not conversation.get("title") or conversation["title"].startswith("Conversation "):
-                conversation["title"] = message[:48] or conversation_path.stem
-            save_conversation(conversation_path, conversation)
-            return _json_response(
-                self,
-                {
-                    "ok": True,
-                    "conversation": {"id": conversation_path.name, "title": conversation.get("title")},
-                    "assistant": response_text,
-                },
-            )
+                full_response = []
+                for token in client.stream_chat(messages, temperature=temperature, max_tokens=max_tokens):
+                    if token:
+                        full_response.append(token)
+                        # Sende das Token im SSE-Format (data: ...)
+                        self.wfile.write(f"data: {json.dumps({'token': token})}\n\n".encode("utf-8"))
+                        self.wfile.flush()
+
+                response_text = "".join(full_response).strip()
+                conversation["messages"].append({"role": "assistant", "content": response_text})
+                
+                if not conversation.get("title") or conversation["title"].startswith("Conversation "):
+                    conversation["title"] = message[:48] or conversation_path.stem
+                save_conversation(conversation_path, conversation)
+
+                # Sende das finale Signal mit den aktualisierten Metadaten
+                final_meta = {
+                    "done": True, 
+                    "conversation": {"id": conversation_path.name, "title": conversation.get("title")}
+                }
+                self.wfile.write(f"data: {json.dumps(final_meta)}\n\n".encode("utf-8"))
+                self.wfile.flush()
+                return
+
+            except Exception as exc:
+                # Da Header möglicherweise schon gesendet wurden, senden wir den Fehler im Stream
+                try:
+                    self.wfile.write(f"data: {json.dumps({'error': str(exc)})}\n\n".encode("utf-8"))
+                    self.wfile.flush()
+                except Exception:
+                    pass
+                return
 
         self.send_error(HTTPStatus.NOT_FOUND)
+
+
+def start_web_ui(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, open_browser: bool = True) -> ArcaWebServer:
+    server = ArcaWebServer((host, port), ArcaWebHandler)
+    if open_browser:
+        webbrowser.open(f"http://{host}:{port}/")
+    return server
 
 
 def render_setup_page(error_message: str = "") -> str:
@@ -377,49 +406,35 @@ def _render_auth_document(title: str, subtitle: str, error_message: str, setup: 
   <title>{html.escape(title)}</title>
   <style>
     :root {{
-      --bg: #f5f2ea;
-      --panel: #ffffff;
-      --panel-soft: #f0ede5;
-      --text: #151512;
-      --muted: #6f6c63;
-      --border: #d9d3c7;
-      --accent: #305f8f;
-      --accent-strong: #244a70;
-      --shadow: 0 20px 50px rgba(20, 20, 18, 0.08);
-    }}
-    html[data-theme="dark"] {{
-      --bg: #0f1114;
-      --panel: #171b20;
-      --panel-soft: #1d2228;
+      --bg: #0b0c0e;
+      --panel: #111317;
+      --panel-soft: #181b22;
       --text: #f3f4f1;
-      --muted: #a8adba;
-      --border: #2c323b;
-      --accent: #7eaef0;
-      --accent-strong: #a4c1fb;
-      --shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
+      --muted: #8e95a5;
+      --border: #1f242e;
+      --accent: #5e94e8;
+      --accent-strong: #8bb2f3;
+      --shadow: 0 20px 50px rgba(0, 0, 0, 0.5);
     }}
     * {{ box-sizing: border-box; }}
-    body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; background: radial-gradient(circle at top, rgba(120, 140, 180, 0.12), transparent 38%), var(--bg); color: var(--text); font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif; }}
-    .card {{ width: min(460px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--border); border-radius: 24px; padding: 28px; box-shadow: var(--shadow); }}
-    .brand {{ display: flex; justify-content: space-between; align-items: center; margin-bottom: 28px; }}
-    .wordmark {{ font-size: 14px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--muted); }}
-    .theme-toggle {{ border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); border-radius: 999px; padding: 10px 14px; cursor: pointer; }}
-    h1 {{ margin: 0 0 10px; font-size: 32px; line-height: 1.1; }}
-    p {{ margin: 0 0 22px; color: var(--muted); line-height: 1.6; }}
-    form {{ display: grid; gap: 14px; }}
-    label {{ display: grid; gap: 8px; font-size: 14px; color: var(--muted); }}
-    input {{ width: 100%; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); border-radius: 14px; padding: 14px 16px; font-size: 16px; }}
-    button {{ border: 0; border-radius: 14px; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: white; padding: 14px 18px; font-weight: 700; cursor: pointer; }}
-    .error {{ background: rgba(220, 76, 76, 0.12); border: 1px solid rgba(220, 76, 76, 0.24); color: #ff8b8b; border-radius: 14px; padding: 12px 14px; margin-bottom: 16px; }}
-    .hint {{ margin-top: 14px; font-size: 13px; }}
+    body {{ margin: 0; min-height: 100vh; display: grid; place-items: center; background: var(--bg); color: var(--text); font-family: system-ui, -apple-system, sans-serif; }}
+    .card {{ width: min(420px, calc(100vw - 32px)); background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 32px; box-shadow: var(--shadow); }}
+    .wordmark {{ font-size: 12px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--accent); font-weight: 700; margin-bottom: 24px; }}
+    h1 {{ margin: 0 0 8px; font-size: 24px; font-weight: 600; letter-spacing: -0.02em; }}
+    p {{ margin: 0 0 24px; color: var(--muted); font-size: 14px; line-height: 1.5; }}
+    form {{ display: grid; gap: 16px; }}
+    label {{ display: grid; gap: 8px; font-size: 13px; color: var(--muted); }}
+    input {{ width: 100%; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); border-radius: 8px; padding: 12px 14px; font-size: 15px; outline: none; transition: border 0.2s; }}
+    input:focus {{ border-color: var(--accent); }}
+    button {{ border: 0; border-radius: 8px; background: var(--accent); color: #000; padding: 12px 18px; font-weight: 600; font-size: 15px; cursor: pointer; transition: background 0.2s; }}
+    button:hover {{ background: var(--accent-strong); }}
+    .error {{ background: rgba(220, 76, 76, 0.1); border: 1px solid rgba(220, 76, 76, 0.2); color: #ff8b8b; border-radius: 8px; padding: 12px; font-size: 14px; }}
+    .hint {{ margin-top: 24px; font-size: 12px; color: var(--muted); text-align: center; }}
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="brand">
-      <div class="wordmark">Arca</div>
-      <button class="theme-toggle" type="button" id="themeToggle">Toggle theme</button>
-    </div>
+    <div class="wordmark">Arca // Odysseus</div>
     <h1>{html.escape(title)}</h1>
     <p>{html.escape(subtitle)}</p>
     {error_html}
@@ -430,17 +445,8 @@ def _render_auth_document(title: str, subtitle: str, error_message: str, setup: 
       </label>
       <button type="submit">{button_label}</button>
     </form>
-    <div class="hint">Runs locally on your machine. The password stays in your config file.</div>
+    <div class="hint">Runs fully locally on your machine.</div>
   </div>
-  <script>
-    const root = document.documentElement;
-    const savedTheme = localStorage.getItem('arca-theme');
-    if (savedTheme) {{ root.dataset.theme = savedTheme; }}
-    document.getElementById('themeToggle').addEventListener('click', () => {{
-      root.dataset.theme = root.dataset.theme === 'dark' ? 'light' : 'dark';
-      localStorage.setItem('arca-theme', root.dataset.theme);
-    }});
-  </script>
 </body>
 </html>"""
 
@@ -451,159 +457,181 @@ def render_app_page() -> str:
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Arca Web UI</title>
+  <title>Odysseus Workspace</title>
   <style>
     :root {
-      --bg: #f5f2ea;
-      --panel: #ffffff;
-      --panel-soft: #f0ede5;
-      --text: #151512;
-      --muted: #6f6c63;
-      --border: #d9d3c7;
-      --accent: #305f8f;
-      --accent-strong: #244a70;
-      --accent-soft: rgba(48, 95, 143, 0.12);
-      --shadow: 0 20px 50px rgba(20, 20, 18, 0.08);
+      --bg-main: #07080a;
+      --bg-side: #0b0c10;
+      --panel: #12141c;
+      --panel-hover: #1c1f2b;
+      --text: #f3f4f6;
+      --muted: #858e9e;
+      --border: #1b1e28;
+      --accent: #4e8bf5;
+      --accent-soft: rgba(78, 139, 245, 0.1);
+      --font: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     }
-    html[data-theme="dark"] {
-      --bg: #0f1114;
-      --panel: #171b20;
-      --panel-soft: #1d2228;
-      --text: #f3f4f1;
-      --muted: #a8adba;
-      --border: #2c323b;
-      --accent: #7eaef0;
-      --accent-strong: #a4c1fb;
-      --accent-soft: rgba(126, 174, 240, 0.16);
-      --shadow: 0 20px 50px rgba(0, 0, 0, 0.35);
-    }
-    * { box-sizing: border-box; }
-    html, body { height: 100%; }
-    body {
-      margin: 0;
-      background: radial-gradient(circle at top, rgba(120, 140, 180, 0.12), transparent 38%), var(--bg);
-      color: var(--text);
-      font-family: Inter, system-ui, -apple-system, Segoe UI, sans-serif;
-    }
-    .shell { display: grid; grid-template-columns: 300px 1fr; height: 100vh; }
-    .sidebar, .main { min-height: 0; }
-    .sidebar {
-      border-right: 1px solid var(--border);
-      background: color-mix(in srgb, var(--panel) 92%, transparent);
-      padding: 18px;
-      display: grid;
-      grid-template-rows: auto auto 1fr auto;
-      gap: 14px;
-    }
-    .brand-row, .topbar, .section-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-    .wordmark { letter-spacing: 0.18em; text-transform: uppercase; font-size: 12px; color: var(--muted); }
-    .icon-btn, .ghost-btn {
-      border: 1px solid var(--border);
-      background: var(--panel-soft);
-      color: var(--text);
-      border-radius: 12px;
-      padding: 10px 12px;
-      cursor: pointer;
-    }
-    .primary-btn {
-      border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
-      background: linear-gradient(135deg, var(--accent), var(--accent-strong));
-      color: white;
-      cursor: pointer;
-    }
-    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; box-shadow: var(--shadow); }
-    .section { display: grid; gap: 10px; }
-    .section label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; }
-    .section input, .section select, .section textarea {
-      width: 100%; border: 1px solid var(--border); background: var(--panel-soft); color: var(--text);
-      border-radius: 12px; padding: 12px 14px; font: inherit;
-    }
-    .conv-list { display: grid; gap: 8px; overflow: auto; padding-right: 6px; }
-    .conv-item { border: 1px solid var(--border); background: var(--panel-soft); color: var(--text); border-radius: 14px; padding: 12px 14px; cursor: pointer; text-align: left; }
-    .conv-item.active { background: var(--accent-soft); border-color: color-mix(in srgb, var(--accent) 40%, var(--border)); }
-    .conv-title { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
-    .conv-meta { font-size: 12px; color: var(--muted); }
-    .main { display: grid; grid-template-rows: auto 1fr auto; min-width: 0; }
-    .topbar { padding: 18px 22px; border-bottom: 1px solid var(--border); backdrop-filter: blur(10px); }
-    .topbar-left { display: flex; align-items: center; gap: 12px; }
-    .status { color: var(--muted); font-size: 13px; }
-    .chat { padding: 22px; overflow: auto; display: grid; gap: 14px; align-content: start; }
-    .msg { max-width: min(760px, 100%); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; line-height: 1.6; white-space: pre-wrap; }
-    .msg.user { margin-left: auto; background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: white; border-color: transparent; }
-    .msg.assistant { background: var(--panel); }
-    .composer { padding: 18px 22px 22px; border-top: 1px solid var(--border); background: color-mix(in srgb, var(--panel) 96%, transparent); }
-    .shell { grid-template-columns: 300px 1fr; height: 100vh; }
-    .composer-grid { display: grid; grid-template-columns: 1fr auto; gap: 12px; }
-    .composer textarea { min-height: 62px; resize: vertical; }
-    .composer-tools { margin-top: 12px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
-    .tool { display: grid; gap: 6px; }
-    .tool label { font-size: 12px; color: var(--muted); }
-    .muted { color: var(--muted); }
-    .empty-state { border: 1px dashed var(--border); border-radius: 18px; padding: 28px; color: var(--muted); text-align: center; }
-    .error { color: #ff8f8f; font-size: 13px; }
-    @media (max-width: 920px) {
-      .shell { grid-template-columns: 1fr; }
-      .sidebar { display: none; }
-      .composer-grid { grid-template-columns: 1fr; }
-      .composer-tools { grid-template-columns: 1fr 1fr; }
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg-main); color: var(--text); font-family: var(--font); height: 100vh; overflow: hidden; }
+    
+    .workspace { display: grid; grid-template-columns: 260px 300px 1fr; height: 100vh; }
+    
+    /* Global Sidebar Navigation (Odysseus Hub) */
+    .nav-bar { background: var(--bg-side); border-right: 1px solid var(--border); padding: 20px 14px; display: flex; flex-direction: column; gap: 24px; }
+    .hub-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); padding-left: 8px; }
+    .nav-group { display: flex; flex-direction: column; gap: 4px; }
+    .nav-item { display: flex; align-items: center; gap: 10px; background: transparent; border: none; color: var(--muted); padding: 10px 12px; border-radius: 8px; cursor: pointer; text-align: left; font-size: 14px; font-weight: 500; transition: all 0.2s; }
+    .nav-item:hover { background: var(--panel); color: var(--text); }
+    .nav-item.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+    .nav-footer { margin-top: auto; border-top: 1px solid var(--border); padding-top: 14px; }
+
+    /* Secondary Sidebar (Conversations / Settings) */
+    .sub-bar { background: #090a0e; border-right: 1px solid var(--border); display: flex; flex-direction: column; min-width: 0; }
+    .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .sidebar-header h3 { font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text); }
+    .action-btn { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 6px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: 500; }
+    .action-btn:hover { background: var(--panel-hover); }
+    .conv-list { flex: 1; overflow-y: auto; padding: 12px 8px; display: flex; flex-direction: column; gap: 4px; }
+    .conv-item { background: transparent; border: none; padding: 12px; border-radius: 8px; cursor: pointer; text-align: left; display: flex; flex-direction: column; gap: 4px; transition: background 0.2s; }
+    .conv-item:hover { background: rgba(255,255,255,0.02); }
+    .conv-item.active { background: var(--panel); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; }
+    .conv-title { font-size: 13.5px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .conv-meta { font-size: 11px; color: var(--muted); }
+
+    /* Main Content Area */
+    .main-view { display: flex; flex-direction: column; background: var(--bg-main); min-width: 0; position: relative; }
+    .top-nav { height: 60px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; padding: 0 24px; background: rgba(7, 8, 10, 0.8); backdrop-filter: blur(12px); z-index: 10; }
+    .current-meta { display: flex; flex-direction: column; }
+    .current-title { font-size: 14px; font-weight: 600; }
+    .current-status { font-size: 11px; color: var(--accent); font-weight: 500; letter-spacing: 0.05em; }
+    
+    /* View Switching Targets */
+    .view-panel { display: none; flex: 1; flex-direction: column; min-height: 0; }
+    .view-panel.active { display: flex; }
+
+    /* Chat View Styles */
+    .chat-scroll { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+    .msg-row { display: flex; width: 100%; }
+    .msg-row.user { justify-content: flex-end; }
+    .msg-bubble { max-width: 70%; padding: 14px 18px; border-radius: 12px; font-size: 14.5px; line-height: 1.6; word-wrap: break-word; }
+    .msg-row.user .msg-bubble { background: var(--accent); color: #000; font-weight: 500; border-radius: 16px 16px 2px 16px; }
+    .msg-row.assistant .msg-bubble { background: var(--panel); border: 1px solid var(--border); color: var(--text); border-radius: 16px 16px 16px 2px; }
+    
+    /* Empty & Alternative Placeholder Views */
+    .placeholder-view { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; p: 24px; color: var(--muted); text-align: center; gap: 12px; }
+    .placeholder-view h2 { color: var(--text); font-weight: 500; font-size: 20px; }
+
+    /* Composer Block */
+    .composer-area { padding: 20px 24px; border-top: 1px solid var(--border); background: var(--bg-main); }
+    .input-box { background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+    .input-box textarea { width: 100%; background: transparent; border: none; color: var(--text); font-family: var(--font); font-size: 14.5px; outline: none; resize: none; min-height: 44px; max-height: 160px; line-height: 1.5; }
+    .input-controls { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid rgba(255,255,255,0.03); padding-top: 8px; }
+    .config-selectors { display: flex; gap: 8px; }
+    .selector { background: var(--bg-main); border: 1px solid var(--border); color: var(--muted); font-size: 12px; padding: 4px 8px; border-radius: 6px; outline: none; cursor: pointer; }
+    .selector:focus { border-color: var(--accent); color: var(--text); }
+    .send-trigger { background: var(--text); color: var(--bg-main); font-weight: 600; border: none; border-radius: 6px; padding: 6px 16px; font-size: 13px; cursor: pointer; }
+    .send-trigger:hover { background: #fff; }
+    
+    /* Parameter Config Panel */
+    .parameter-row { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 12px; }
+    .param-field { display: flex; flex-direction: column; gap: 4px; }
+    .param-field label { font-size: 11px; color: var(--muted); text-transform: uppercase; font-weight: 600; }
+    .param-field input { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 6px 10px; border-radius: 6px; font-size: 12px; outline: none; }
+    .sys-field { grid-column: 1 / -1; }
+    .sys-field textarea { background: var(--panel); border: 1px solid var(--border); color: var(--text); padding: 8px; border-radius: 6px; font-size: 12px; outline: none; resize: none; height: 50px; font-family: var(--font); }
+
+    .error-banner { color: #ff6b6b; font-size: 12px; margin-top: 8px; display: none; }
   </style>
 </head>
 <body>
-  <div class="shell">
-    <aside class="sidebar">
-      <div class="brand-row">
-        <div class="wordmark">Arca</div>
-        <button class="icon-btn" id="themeToggle" type="button">Theme</button>
+
+  <div class="workspace">
+    <nav class="nav-bar">
+      <div class="hub-title">Odysseus AI</div>
+      <div class="nav-group">
+        <button class="nav-item active" onclick="switchView('chat')">
+          <span>💬</span> Workspace Chat
+        </button>
+        <button class="nav-item" onclick="switchView('compare')">
+          <span>⚖️</span> Blind Compare
+        </button>
+        <button class="nav-item" onclick="switchView('research')">
+          <span>🔍</span> Deep Research
+        </button>
       </div>
-      <div class="section panel" style="padding:14px;">
-        <div class="section-head"><strong>Chats</strong><button class="ghost-btn" id="newChatBtn" type="button">New</button></div>
-        <div id="conversationList" class="conv-list"></div>
+      <div class="nav-footer">
+        <button class="nav-item" style="width:100%" onclick="location.href='/logout'">
+          <span>🚪</span> Exit Session
+        </button>
       </div>
-      <div class="section panel" style="padding:14px;">
-        <div class="section-head"><strong>Session</strong></div>
-        <button class="ghost-btn" id="logoutBtn" type="button">Log out</button>
+    </nav>
+
+    <aside class="sub-bar">
+      <div class="sidebar-header">
+        <h3 id="sidebarContextTitle">Conversations</h3>
+        <button class="action-btn" id="newChatBtn">New Chat</button>
       </div>
+      <div id="conversationList" class="conv-list"></div>
     </aside>
 
-    <main class="main">
-      <div class="topbar">
-        <div class="topbar-left">
-          <strong id="pageTitle">Arca Web UI</strong>
-          <span class="status" id="statusText">Ready</span>
+    <main class="main-view">
+      <header class="top-nav">
+        <div class="current-meta">
+          <span class="current-title" id="pageTitle">Select or create a room</span>
+          <span class="current-status" id="statusText">System Idle</span>
         </div>
-        <div class="topbar-left">
-          <button class="icon-btn" id="themeToggleTop" type="button">Dark / Light</button>
+      </header>
+
+      <section id="view-chat" class="view-panel active">
+        <div id="chatLog" class="chat-scroll">
+          <div class="placeholder-view">
+            <h2>Welcome to your Local Node</h2>
+            <p>Select a conversation from the left pane or spawn a new instance.</p>
+          </div>
         </div>
-      </div>
-      <div id="chatLog" class="chat">
-        <div class="empty-state">Select a conversation or start a new one.</div>
-      </div>
-      <div class="composer">
-        <div class="composer-grid">
-          <textarea id="messageInput" placeholder="Ask Arca anything..."></textarea>
-          <button class="primary-btn" id="sendBtn" type="button">Send</button>
+        
+        <div class="composer-area">
+          <div class="input-box">
+            <textarea id="messageInput" placeholder="Type your instruction or inquiry here... (Press Enter to transmit, Shift+Enter for newline)"></textarea>
+            <div class="input-controls">
+              <div class="config-selectors">
+                <select id="providerSelect" class="selector"></select>
+                <select id="modelSelect" class="selector"></select>
+              </div>
+              <button class="send-trigger" id="sendBtn">Transmit</button>
+            </div>
+          </div>
+          
+          <div class="parameter-row">
+            <div class="param-field"><label>Temperature</label><input id="temperatureInput" type="number" min="0" max="2" step="0.1" value="0.7" /></div>
+            <div class="param-field"><label>Max Tokens</label><input id="maxTokensInput" type="number" min="16" max="4096" value="2048" /></div>
+            <div class="param-field sys-field"><label>System Context Directive</label><textarea id="systemPromptInput" placeholder="Inject overarching operational parameters..."></textarea></div>
+          </div>
+          <div class="error-banner" id="errorText"></div>
         </div>
-        <div class="composer-tools">
-          <div class="tool"><label>Provider</label><select id="providerSelect"></select></div>
-          <div class="tool"><label>Model</label><input id="modelInput" type="text" placeholder="gpt-4o / claude / llama3" /></div>
-          <div class="tool"><label>Temperature</label><input id="temperatureInput" type="number" min="0" max="2" step="0.1" value="0.7" /></div>
-          <div class="tool"><label>Max tokens</label><input id="maxTokensInput" type="number" min="16" max="4096" step="1" value="1024" /></div>
-          <div class="tool" style="grid-column: 1 / -1;"><label>System prompt</label><textarea id="systemPromptInput" placeholder="Optional instructions for the model..."></textarea></div>
+      </section>
+
+      <section id="view-compare" class="view-panel">
+        <div class="placeholder-view">
+          <h2>⚖️ Model Blind Comparison Mode</h2>
+          <p>Evaluate engine performances side-by-side without interface bias. Feature initialization upcoming.</p>
         </div>
-        <div class="error" id="errorText"></div>
-      </div>
+      </section>
+
+      <section id="view-research" class="view-panel">
+        <div class="placeholder-view">
+          <h2>🔍 Agentic Deep Research Engine</h2>
+          <p>Automated recursive crawling and localized information aggregation pipeline. Feature initialization upcoming.</p>
+        </div>
+      </section>
     </main>
   </div>
 
   <script>
-    const root = document.documentElement;
     const chatLog = document.getElementById('chatLog');
     const conversationList = document.getElementById('conversationList');
     const providerSelect = document.getElementById('providerSelect');
-    const modelInput = document.getElementById('modelInput');
+    const modelSelect = document.getElementById('modelSelect');
     const temperatureInput = document.getElementById('temperatureInput');
     const maxTokensInput = document.getElementById('maxTokensInput');
     const systemPromptInput = document.getElementById('systemPromptInput');
@@ -611,147 +639,237 @@ def render_app_page() -> str:
     const statusText = document.getElementById('statusText');
     const errorText = document.getElementById('errorText');
     const pageTitle = document.getElementById('pageTitle');
-    const savedTheme = localStorage.getItem('arca-theme') || 'dark';
+    const newChatBtn = document.getElementById('newChatBtn');
+    
     let bootstrap = null;
     let activeConversationId = localStorage.getItem('arca-active-conversation') || '';
 
-    function applyTheme(theme) {
-      root.dataset.theme = theme;
-      localStorage.setItem('arca-theme', theme);
+    // View Routing
+    function switchView(viewName) {
+      document.querySelectorAll('.nav-item').forEach(btn => btn.classList.remove('active'));
+      document.querySelectorAll('.view-panel').forEach(panel => panel.classList.remove('active'));
+      
+      const targetBtn = Array.from(document.querySelectorAll('.nav-item')).find(btn => btn.getAttribute('onclick').includes(viewName));
+      if(targetBtn) targetBtn.classList.add('active');
+      
+      document.getElementById(`view-${viewName}`).classList.add('active');
+      
+      const subBar = document.querySelector('.sub-bar');
+      if (viewName !== 'chat') {
+        subBar.style.display = 'none';
+        document.querySelector('.workspace').style.gridTemplateColumns = "260px 1fr";
+      } else {
+        subBar.style.display = 'flex';
+        document.querySelector('.workspace').style.gridTemplateColumns = "260px 300px 1fr";
+      }
     }
-    applyTheme(savedTheme);
 
     function escapeHtml(text) {
-      return String(text).replace(/[&<>'"]/g, (ch) => {
-        if (ch === '&') return '&amp;';
-        if (ch === '<') return '&lt;';
-        if (ch === '>') return '&gt;';
-        if (ch === '"') return '&quot;';
-        return '&#39;';
-      });
+      return String(text).replace(/[&<>'"]/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[ch]));
     }
 
     function setStatus(text) { statusText.textContent = text; }
-    function setError(text) { errorText.textContent = text || ''; }
+    function setError(text) { 
+      if(text) { errorText.textContent = text; errorText.style.display = 'block'; }
+      else { errorText.style.display = 'none'; }
+    }
 
     function renderConversations(conversations) {
       conversationList.innerHTML = '';
       if (!conversations.length) {
-        conversationList.innerHTML = '<div class="muted">No saved chats yet.</div>';
+        conversationList.innerHTML = '<div style="padding:20px; font-size:12px; color:var(--muted)">No sessions active.</div>';
         return;
       }
-      conversations.forEach((conversation) => {
-        const button = document.createElement('button');
-        button.className = 'conv-item' + (conversation.id === activeConversationId ? ' active' : '');
-        button.type = 'button';
-        button.innerHTML = '<div class="conv-title">' + escapeHtml(conversation.title || conversation.id) + '</div><div class="conv-meta">' + (conversation.message_count || 0) + ' messages</div>';
-        button.addEventListener('click', () => loadConversation(conversation.id));
-        conversationList.appendChild(button);
+      conversations.forEach((conv) => {
+        const btn = document.createElement('button');
+        btn.className = 'conv-item' + (conv.id === activeConversationId ? ' active' : '');
+        btn.innerHTML = `<div class="conv-title">${escapeHtml(conv.title || conv.id)}</div><div class="conv-meta">${conv.message_count || 0} operations</div>`;
+        btn.addEventListener('click', () => loadConversation(conv.id));
+        conversationList.appendChild(btn);
       });
     }
 
     function renderMessages(messages) {
       if (!messages.length) {
-        chatLog.innerHTML = '<div class="empty-state">This chat is empty. Send the first message.</div>';
+        chatLog.innerHTML = '<div class="placeholder-view"><h2>Empty Context</h2><p>Send a packet to start the run.</p></div>';
         return;
       }
       chatLog.innerHTML = '';
-      messages.forEach((message) => {
-        const div = document.createElement('div');
-        div.className = 'msg ' + (message.role || 'assistant');
-        div.textContent = message.content || '';
-        chatLog.appendChild(div);
+      messages.forEach((m) => {
+        const row = document.createElement('div');
+        row.className = 'msg-row ' + (m.role === 'user' ? 'user' : 'assistant');
+        row.innerHTML = `<div class="msg-bubble">${escapeHtml(m.content || '')}</div>`;
+        chatLog.appendChild(row);
       });
       chatLog.scrollTop = chatLog.scrollHeight;
     }
 
+    // Provider-spezifische Modellupdates
+    providerSelect.addEventListener('change', () => {
+      updateModelDropdown();
+    });
+
+    function updateModelDropdown() {
+      modelSelect.innerHTML = '';
+      const prov = providerSelect.value;
+      if (prov === 'ollama' && bootstrap && bootstrap.ollama_models) {
+        bootstrap.ollama_models.forEach(m => {
+          const opt = document.createElement('option');
+          opt.value = m; opt.textContent = m;
+          modelSelect.appendChild(opt);
+        });
+      } else {
+        const fallbackModel = prov === 'openai' ? 'gpt-4o' : 'claude-3-5-sonnet';
+        const opt = document.createElement('option');
+        opt.value = fallbackModel; opt.textContent = fallbackModel;
+        modelSelect.appendChild(opt);
+      }
+    }
+
     async function loadBootstrap() {
-      const response = await fetch('/api/bootstrap');
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Failed to load bootstrap data');
-      bootstrap = data;
-      providerSelect.innerHTML = '';
-      data.providers.forEach((provider) => {
-        const option = document.createElement('option');
-        option.value = provider;
-        option.textContent = provider;
-        providerSelect.appendChild(option);
-      });
-      providerSelect.value = data.provider || data.providers[0] || 'openai';
-      if (data.ollama_models && data.ollama_models.length && providerSelect.value === 'ollama') {
-        modelInput.value = data.ollama_models[0];
-      }
-      renderConversations(data.conversations || []);
-      if (!activeConversationId && data.conversations && data.conversations.length) {
-        activeConversationId = data.conversations[0].id;
-      }
-      if (activeConversationId) {
-        await loadConversation(activeConversationId);
-      }
+      try {
+        const response = await fetch('/api/bootstrap');
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Bootstrap failed');
+        bootstrap = data;
+        
+        providerSelect.innerHTML = '';
+        data.providers.forEach((p) => {
+          const opt = document.createElement('option');
+          opt.value = p; opt.textContent = p.toUpperCase();
+          providerSelect.appendChild(opt);
+        });
+        providerSelect.value = data.provider || 'openai';
+        
+        updateModelDropdown();
+        renderConversations(data.conversations || []);
+        
+        if (!activeConversationId && data.conversations?.length) {
+          activeConversationId = data.conversations[0].id;
+        }
+        if (activeConversationId) await loadConversation(activeConversationId);
+      } catch(e) { setError(e.message); }
     }
 
-    async function loadConversation(conversationId) {
-      activeConversationId = conversationId;
-      localStorage.setItem('arca-active-conversation', conversationId);
+    async function loadConversation(id) {
+      activeConversationId = id;
+      localStorage.setItem('arca-active-conversation', id);
       setError('');
-      setStatus('Loading conversation...');
-      const response = await fetch('/api/conversations/' + encodeURIComponent(conversationId));
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Failed to load conversation');
-      pageTitle.textContent = data.conversation.title || conversationId;
-      renderMessages(data.conversation.messages || []);
-      if (bootstrap) renderConversations(bootstrap.conversations || []);
-      setStatus('Ready');
+      setStatus('Synchronizing...');
+      try {
+        const response = await fetch('/api/conversations/' + encodeURIComponent(id));
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Sync failure');
+        pageTitle.textContent = data.conversation.title || id;
+        renderMessages(data.conversation.messages || []);
+        document.querySelectorAll('.conv-item').forEach(el => el.classList.remove('active'));
+        if (bootstrap) renderConversations(bootstrap.conversations || []);
+        setStatus('Node Online');
+      } catch(e) { setError(e.message); }
     }
 
-    async function createNewConversation() {
-      const response = await fetch('/api/conversations/new', { method: 'POST' });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Failed to create conversation');
-      activeConversationId = data.conversation.id;
-      localStorage.setItem('arca-active-conversation', activeConversationId);
-      await loadBootstrap();
-    }
+    newChatBtn.addEventListener('click', async () => {
+      try {
+        const response = await fetch('/api/conversations/new', { method: 'POST' });
+        const data = await response.json();
+        if (!response.ok || !data.ok) throw new Error(data.error || 'Creation failed');
+        activeConversationId = data.conversation.id;
+        localStorage.setItem('arca-active-conversation', activeConversationId);
+        await loadBootstrap();
+      } catch(e) { setError(e.message); }
+    });
 
+    // TRANSMIT MESSAGE (Echtes Server-Sent Events Streaming)
     async function sendMessage() {
       const message = messageInput.value.trim();
       if (!message) return;
-      if (!activeConversationId) await createNewConversation();
+      
+      if (!activeConversationId) {
+        setError('Create a session before transmission.');
+        return;
+      }
+      
       setError('');
-      setStatus('Thinking...');
-      const response = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          conversation_id: activeConversationId,
-          message,
-          provider: providerSelect.value,
-          model: modelInput.value.trim(),
-          temperature: Number(temperatureInput.value || 0.7),
-          max_tokens: Number(maxTokensInput.value || 1024),
-          system_prompt: systemPromptInput.value,
-        }),
-      });
-      const data = await response.json();
-      if (!response.ok || !data.ok) throw new Error(data.error || 'Request failed');
+      setStatus('Streaming Pipeline Active...');
       messageInput.value = '';
-      activeConversationId = data.conversation.id;
-      await loadConversation(activeConversationId);
+
+      // 1. User-Nachricht sofort lokal einblenden
+      if(chatLog.querySelector('.placeholder-view')) chatLog.innerHTML = '';
+      const userRow = document.createElement('div');
+      userRow.className = 'msg-row user';
+      userRow.innerHTML = `<div class="msg-bubble">${escapeHtml(message)}</div>`;
+      chatLog.appendChild(userRow);
+      chatLog.scrollTop = chatLog.scrollHeight;
+
+      // 2. Platzhalter für Assistenten-Antwort erstellen
+      const aiRow = document.createElement('div');
+      aiRow.className = 'msg-row assistant';
+      const aiBubble = document.createElement('div');
+      aiBubble.className = 'msg-bubble';
+      aiBubble.textContent = '';
+      aiRow.appendChild(aiBubble);
+      chatLog.appendChild(aiRow);
+
+      try {
+        const response = await fetch('/api/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            conversation_id: activeConversationId,
+            message,
+            provider: providerSelect.value,
+            model: modelSelect.value,
+            temperature: Number(temperatureInput.value || 0.7),
+            max_tokens: Number(maxTokensInput.value || 1024),
+            system_prompt: systemPromptInput.value,
+          }),
+        });
+
+        if (!response.ok) throw new Error("Network Pipeline Error");
+
+        // Stream auslesen
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder("utf-8");
+        let buffer = "";
+
+        while (true) {
+          const { value, done } = await reader.read();
+          if (done) break;
+          
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop(); // Unvollständige Zeile im Puffer behalten
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              const rawData = line.slice(6).trim();
+              if (!rawData) continue;
+              
+              const parsed = JSON.parse(rawData);
+              if (parsed.error) throw new Error(parsed.error);
+              
+              if (parsed.token) {
+                // Token live anhängen
+                aiBubble.textContent += parsed.token;
+                chatLog.scrollTop = chatLog.scrollHeight;
+              }
+              
+              if (parsed.done) {
+                // Stream beendet, Sidebar-Metadaten neu laden
+                await loadBootstrap();
+                setStatus('Node Online');
+              }
+            }
+          }
+        }
+      } catch (e) {
+        setError(e.message);
+        aiBubble.textContent = "Pipeline Transmission Error: " + e.message;
+        setStatus('Error State');
+      }
     }
 
-    document.getElementById('themeToggle').addEventListener('click', () => {
-      const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
-      applyTheme(nextTheme);
-    });
-    document.getElementById('themeToggleTop').addEventListener('click', () => {
-      const nextTheme = root.dataset.theme === 'dark' ? 'light' : 'dark';
-      applyTheme(nextTheme);
-    });
-    document.getElementById('newChatBtn').addEventListener('click', createNewConversation);
-    document.getElementById('logoutBtn').addEventListener('click', async () => {
-      window.location.href = '/logout';
-    });
-    document.getElementById('sendBtn').addEventListener('click', sendMessage);
+    sendBtn.addEventListener('click', sendMessage);
     messageInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
@@ -759,27 +877,8 @@ def render_app_page() -> str:
       }
     });
 
-    loadBootstrap().catch((err) => {
-      console.error(err);
-      setError(err.message);
-      setStatus('Error');
-    });
+    // Initialisierung starten
+    loadBootstrap();
   </script>
 </body>
 </html>"""
-
-
-def start_web_ui(host: str = DEFAULT_HOST, port: int = DEFAULT_PORT, open_browser: bool = True) -> None:
-    """Startet den HTTP-Server für das Web-Interface."""
-    server = ArcaWebServer((host, port), ArcaWebHandler)
-    url = f"http://{host}:{port}"
-    print(f"[*] Arca Web-Server läuft auf {url}")
-    
-    if open_browser:
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
-        
-    try:
-        server.serve_forever()
-    except KeyboardInterrupt:
-        print("\n[*] Server wird beendet...")
-        server.server_close()
