@@ -882,3 +882,18 @@ def render_app_page() -> str:
   </script>
 </body>
 </html>"""
+if __name__ == "__main__":
+    import os
+    print("==================================================")
+    print("      ARCA NODE ONLINE // COGNITIVE HUB       ")
+    print("==================================================")
+    print("Establish connection on http://127.0.0.1:8765 ...")
+    
+    # Startet den Server auf Port 8765 und öffnet den Browser
+    server = start_web_ui(host="127.0.0.1", port=8765, open_browser=True)
+    
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\n[SIGNAL] Odysseus Node shutting down. Connection terminated.")
+        server.server_close()
