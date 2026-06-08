@@ -8,7 +8,7 @@ class SQLiteManager:
 
         if db_path is None:
 
-            data_dir = Path("data")
+            data_dir = Path.home() / ".config" / "arca"
             data_dir.mkdir(
                 parents=True,
                 exist_ok=True

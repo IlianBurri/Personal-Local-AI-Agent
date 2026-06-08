@@ -9,11 +9,14 @@ class AnthropicClient(BaseLLMClient):
     def __init__(
         self,
         api_key: str,
-        model: str = "claude-2"
+        model: str = "claude-3-5-sonnet-latest",
+        client=None
     ):
-        from anthropic import Anthropic
+        if client is None:
+            from anthropic import Anthropic
+            client = Anthropic(api_key=api_key)
 
-        self.client = Anthropic(api_key=api_key)
+        self.client = client
         self.model = model
 
     def stream_chat(
@@ -32,14 +35,24 @@ class AnthropicClient(BaseLLMClient):
             0.6
         )
 
+        system_parts = [
+            m["content"]
+            for m in messages
+            if m.get("role") == "system"
+        ]
+        anthropic_messages = [
+            m
+            for m in messages
+            if m.get("role") in {"user", "assistant"}
+        ]
         prompt = "\n".join(
-            [
-                f"{m['role']}: {m['content']}"
-                for m in messages
-            ]
+            f"{m['role']}: {m['content']}"
+            for m in anthropic_messages
         )
 
         kwargs.setdefault("max_tokens", 1024)
+        if system_parts:
+            kwargs.setdefault("system", "\n\n".join(system_parts))
 
         attempt = 0
 
@@ -52,7 +65,7 @@ class AnthropicClient(BaseLLMClient):
                 try:
 
                     with self.client.messages.stream(
-                        messages=messages,
+                        messages=anthropic_messages,
                         model=self.model,
                         **kwargs
                     ) as stream:

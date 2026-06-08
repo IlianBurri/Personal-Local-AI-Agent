@@ -35,22 +35,20 @@ class OllamaClient(BaseLLMClient):
 
         model = self.model or "llama3"
 
-        url = f"{self.base_url}/api/generate"
+        url = f"{self.base_url}/api/chat"
 
         payload = {
             "model": model,
-            "prompt": "\n".join(
-                f"{m['role']}: {m['content']}"
-                for m in messages
-            ),
+            "messages": messages,
             "stream": True,
         }
+        payload.update(kwargs)
 
         with requests.post(
             url,
             json=payload,
             stream=True,
-            timeout=60
+            timeout=(10, 120)
         ) as response:
 
             response.raise_for_status()
@@ -63,18 +61,17 @@ class OllamaClient(BaseLLMClient):
                     continue
 
                 try:
-
                     data = json.loads(line)
-
+                except Exception:
+                    text = line
+                else:
+                    message = data.get("message") or {}
                     text = (
-                        data.get("response")
+                        message.get("content")
+                        or data.get("response")
                         or data.get("text")
                         or ""
                     )
-
-                except Exception:
-
-                    text = line
 
                 if text:
                     yield text

@@ -12,6 +12,10 @@ class StreamWorker(QtCore.QObject):
         self.client = client
         self.messages = messages
         self.kwargs = kwargs or {}
+        self._cancelled = False
+
+    def cancel(self):
+        self._cancelled = True
 
     @QtCore.pyqtSlot()
     def run(self):
@@ -20,6 +24,8 @@ class StreamWorker(QtCore.QObject):
                 self.messages,
                 **self.kwargs
             ):
+                if self._cancelled:
+                    break
                 if tok:
                     self.token.emit(str(tok))
 

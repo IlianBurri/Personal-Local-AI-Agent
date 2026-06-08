@@ -4,8 +4,6 @@ import requests
 
 
 def test_openai_streaming_basic():
-    client = OpenAIClient(api_key="fake", model="gpt-test")
-
     class FakeCompletions:
         @staticmethod
         def create(model, messages, stream=True, **kwargs):
@@ -24,18 +22,20 @@ def test_openai_streaming_basic():
                 ]
             )
 
-    client.client = types.SimpleNamespace(
-        chat=types.SimpleNamespace(
-            completions=FakeCompletions
-        )
+    client = OpenAIClient(
+        api_key="fake",
+        model="gpt-test",
+        client=types.SimpleNamespace(
+            chat=types.SimpleNamespace(
+                completions=FakeCompletions
+            )
+        ),
     )
     out = "".join([t for t in client.stream_chat([{"role":"user","content":"hi"}])])
     assert out == "Hello world"
 
 
 def test_anthropic_streaming_messages_stream():
-    ac = AnthropicClient(api_key="fake", model="claude-test")
-
     class FakeStream:
         text_stream = ["Part1 ", "Part2"]
 
@@ -51,7 +51,7 @@ def test_anthropic_streaming_messages_stream():
             def stream(messages, model, **kwargs):
                 return FakeStream()
 
-    ac.client = FakeClient()
+    ac = AnthropicClient(api_key="fake", model="claude-test", client=FakeClient())
     out = "".join([t for t in ac.stream_chat([{"role":"user","content":"hi"}])])
     assert out == "Part1 Part2"
 
@@ -76,13 +76,16 @@ def test_ollama_streaming_and_list(monkeypatch):
 
     # mock streaming post
     def fake_post(url, json=None, stream=True, timeout=60, headers=None):
+        assert url.endswith("/api/chat")
+        assert json["messages"] == [{"role":"user","content":"hi"}]
+
         class R:
             def raise_for_status(self):
                 pass
 
             def iter_lines(self, decode_unicode=True):
-                yield '{"text":"stream1"}'
-                yield '{"text":"stream2"}'
+                yield '{"message":{"content":"stream1"}}'
+                yield '{"message":{"content":"stream2"}}'
 
             def __enter__(self):
                 return self

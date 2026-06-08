@@ -9,11 +9,14 @@ class OpenAIClient(BaseLLMClient):
     def __init__(
         self,
         api_key: str,
-        model: str = "gpt-4o"
+        model: str = "gpt-4o",
+        client=None
     ):
-        from openai import OpenAI
+        if client is None:
+            from openai import OpenAI
+            client = OpenAI(api_key=api_key)
 
-        self.client = OpenAI(api_key=api_key)
+        self.client = client
         self.model = model
 
     def stream_chat(
