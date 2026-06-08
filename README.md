@@ -2,7 +2,7 @@
 
 > Your models. Your machine. Your rules.
 
-A lightweight desktop AI agent built with Python + PyQt6. Connect to Anthropic, OpenAI, or a local Ollama instance — switchable without touching code.
+A lightweight desktop AI agent built with Python + PyQt6. Connect to Anthropic, OpenAI, or a local Ollama instance.
 
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue?style=flat-square)
 ![PyQt6](https://img.shields.io/badge/UI-PyQt6-green?style=flat-square)
@@ -13,12 +13,12 @@ A lightweight desktop AI agent built with Python + PyQt6. Connect to Anthropic, 
 
 ## Features
 
-- **Multi-provider** — Anthropic, OpenAI, and local Ollama in one app
-- **Local-first** — run models entirely on your machine via Ollama
-- **Streaming responses** — real-time output as the model generates
-- **Multi-turn memory** — full conversation context per session
-- **Tool use** — extensible tool support via the `tools/` module
-- **Clean UI** — distraction-free chat interface, no Electron, no bloat
+- **Multi-provider** - Anthropic, OpenAI, and local Ollama provider clients
+- **Local-first** - run models entirely on your machine via Ollama
+- **Streaming responses** - real-time output as the model generates
+- **Multi-turn memory** - full conversation context per session
+- **Tool use** - extensible tool support via the `tools/` module
+- **Clean UI** - distraction-free chat interface, no Electron, no bloat
 
 ---
 
@@ -32,10 +32,10 @@ cd arca
 python3 -m venv .venv
 source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-python3 -m ui.main
+python run.py
 ```
 
-On first launch, arca will prompt you to configure a provider.
+On first launch, arca will use your local Ollama instance by default.
 
 ---
 
@@ -53,13 +53,13 @@ Provider config is stored in `~/.config/arca/config.json`.
 
 ## Project structure
 
-```
+```text
 arca/
-├── core/        # Config, provider management
-├── ui/          # PyQt6 chat interface
-├── tools/       # Tool definitions for LLM tool use
-├── docs/        # GitHub Pages landing page
-└── requirements.txt
+core/        # Config, providers, persistence
+ui/          # PyQt6 chat interface
+tools/       # Tool definitions for LLM tool use
+docs/        # GitHub Pages landing page
+requirements.txt
 ```
 
 ---

@@ -1,29 +1,61 @@
-# run.py
 import sys
 from pathlib import Path
 
-# Wir sagen Python explizit, dass es im Hauptverzeichnis suchen darf
 root_dir = Path(__file__).parent.absolute()
+
 if str(root_dir) not in sys.path:
     sys.path.insert(0, str(root_dir))
 
-try:
-    print("==================================================")
-    print("        ARCA CORE CORE PIPELINE INITIALIZED   ")
-    print("==================================================")
-    
-    from ui.web_app import start_web_ui
-    
-    print("\n[LAUNCH] Spin up Server on http://127.0.0.1:8765 ...")
-    server = start_web_ui(host="127.0.0.1", port=8765, open_browser=True)
-    
-    print("[ONLINE] Odysseus Studio is now fully operational.\n")
-    server.serve_forever()
+from PyQt6.QtWidgets import QApplication
+from ui.main_window import MainWindow
 
-except KeyboardInterrupt:
-    print("\n[SHUTDOWN] Shutting down Odysseus gracefully.")
-except Exception as e:
-    print(f"\n[CRITICAL ERROR] Launch failed: {e}")
-    import traceback
-    traceback.print_exc()
-    input("\nPress Enter to exit...")
+
+def main():
+    app = QApplication(sys.argv)
+    app.setStyleSheet("""
+QMainWindow {
+    background: #0f1117;
+}
+
+QWidget {
+    background: #0f1117;
+    color: white;
+}
+
+QLineEdit {
+    background: #1c1f26;
+    border: 1px solid #2b313d;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+QPushButton {
+    background: #2d6cdf;
+    border: none;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+QPushButton:hover {
+    background: #3b7cff;
+}
+
+QListWidget {
+    background: #151922;
+    border: none;
+}
+
+QComboBox {
+    background: #1c1f26;
+    padding: 6px;
+}
+""")
+
+    window = MainWindow()
+    window.show()
+
+    sys.exit(app.exec())
+
+
+if __name__ == "__main__":
+    main()
