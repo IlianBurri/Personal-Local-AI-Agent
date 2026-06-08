@@ -1,4 +1,3 @@
-import json
 import types
 from core.clients import OpenAIClient, AnthropicClient, OllamaClient
 import requests
@@ -7,14 +6,29 @@ import requests
 def test_openai_streaming_basic():
     client = OpenAIClient(api_key="fake", model="gpt-test")
 
-    class FakeChatCompletion:
+    class FakeCompletions:
         @staticmethod
         def create(model, messages, stream=True, **kwargs):
-            # simulate streaming chunks with deltas
-            yield {"choices": [{"delta": {"content": "Hello "}}]}
-            yield {"choices": [{"delta": {"content": "world"}}]}
+            yield types.SimpleNamespace(
+                choices=[
+                    types.SimpleNamespace(
+                        delta=types.SimpleNamespace(content="Hello ")
+                    )
+                ]
+            )
+            yield types.SimpleNamespace(
+                choices=[
+                    types.SimpleNamespace(
+                        delta=types.SimpleNamespace(content="world")
+                    )
+                ]
+            )
 
-    client._openai = types.SimpleNamespace(ChatCompletion=FakeChatCompletion)
+    client.client = types.SimpleNamespace(
+        chat=types.SimpleNamespace(
+            completions=FakeCompletions
+        )
+    )
     out = "".join([t for t in client.stream_chat([{"role":"user","content":"hi"}])])
     assert out == "Hello world"
 
@@ -22,12 +36,20 @@ def test_openai_streaming_basic():
 def test_anthropic_streaming_messages_stream():
     ac = AnthropicClient(api_key="fake", model="claude-test")
 
+    class FakeStream:
+        text_stream = ["Part1 ", "Part2"]
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
     class FakeClient:
         class messages:
             @staticmethod
             def stream(messages, model, **kwargs):
-                yield {"content": "Part1 "}
-                yield {"content": "Part2"}
+                return FakeStream()
 
     ac.client = FakeClient()
     out = "".join([t for t in ac.stream_chat([{"role":"user","content":"hi"}])])
