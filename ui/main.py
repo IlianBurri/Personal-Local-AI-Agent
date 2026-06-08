@@ -18,7 +18,6 @@ except Exception:
 
 from core.config import load_config, save_config
 from core.clients import OpenAIClient, AnthropicClient, OllamaClient
-from ui.web_app import start_web_ui
 
 
 APP_BG = "#F5F4F0"
@@ -602,18 +601,7 @@ def run_web_app(host: str = "127.0.0.1", port: int = 8765, open_browser: bool = 
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Arca agent launcher")
-    parser.add_argument("--mode", choices=["web", "desktop"], default="web")
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument("--no-open-browser", action="store_true")
-    args = parser.parse_args()
-
-    if args.mode == "desktop":
-        run_desktop_app()
-        return
-
-    run_web_app(host=args.host, port=args.port, open_browser=not args.no_open_browser)
+    run_desktop_app()
 
 
 if __name__ == "__main__":
