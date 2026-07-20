@@ -66,11 +66,7 @@ class ModelSelector(QtWidgets.QWidget):
         self.mode_btn.clicked.connect(self._toggle_dark)
         layout.addWidget(self.mode_btn)
 
-        spacer = QtWidgets.QSpacerItem(
-            10, 0,
-            QtWidgets.QSizePolicy.Policy.Fixed, QtWidgets.QSizePolicy.Policy.Minimum,
-        )
-        layout.addSpacer(spacer)
+        layout.addSpacing(10)
 
         # Settings gear button
         self.settings_btn = QtWidgets.QPushButton("\u2699")  # ⚙
