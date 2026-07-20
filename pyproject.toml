@@ -6,16 +6,16 @@ authors = ["Ilian Burri"]
 
 [tool.poetry.dependencies]
 python = ">=3.10"
-PyQt6 = "6.6.0"
-openai = "1.32.0"
-anthropic = "0.34.0"
-requests = "2.31.0"
-pygments = "2.16.1"
-pyinstaller = "5.14.0"
+PyQt6 = "6.11.0"
+openai = "2.46.0"
+anthropic = "0.117.0"
+requests = "2.34.2"
+pygments = "2.20.0"
+pyinstaller = "6.21.0"
 
 [tool.poetry.group.dev.dependencies]
-pytest = "7.4.2"
-flake8 = "6.1.0"
+pytest = "9.1.1"
+flake8 = "7.3.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
