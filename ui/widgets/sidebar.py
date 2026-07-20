@@ -66,7 +66,7 @@ class Sidebar(QtWidgets.QWidget):
         self.scroll.setWidgetResizable(True)
         self.scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        self.scroll.setStyleSheet(f"background: transparent; border: none;")
+        self.scroll.setStyleSheet("background: transparent; border: none;")
 
         self.list_container = QtWidgets.QWidget()
         self.list_layout = QtWidgets.QVBoxLayout(self.list_container)

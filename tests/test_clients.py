@@ -29,7 +29,7 @@ def test_openai_streaming_basic():
             completions=FakeCompletions
         )
     )
-    out = "".join([t for t in client.stream_chat([{"role":"user","content":"hi"}])])
+    out = "".join([t for t in client.stream_chat([{"role": "user", "content": "hi"}])])
     assert out == "Hello world"
 
 
@@ -52,7 +52,7 @@ def test_anthropic_streaming_messages_stream():
                 return FakeStream()
 
     ac.client = FakeClient()
-    out = "".join([t for t in ac.stream_chat([{"role":"user","content":"hi"}])])
+    out = "".join([t for t in ac.stream_chat([{"role": "user", "content": "hi"}])])
     assert out == "Part1 Part2"
 
 
@@ -93,5 +93,5 @@ def test_ollama_streaming_and_list(monkeypatch):
         return R()
 
     monkeypatch.setattr(requests, "post", fake_post)
-    out = "".join([t for t in oc.stream_chat([{"role":"user","content":"hi"}])])
+    out = "".join([t for t in oc.stream_chat([{"role": "user", "content": "hi"}])])
     assert out == "Hello world"

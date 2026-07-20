@@ -184,7 +184,7 @@ class ModelSelector(QtWidgets.QWidget):
     def _toggle_dark(self):
         self.theme_changed.emit(Theme(dark=not self._t.dark, accent=self._t.accent))
 
-    def _on_accent_selected(self, preset: "AccentPreset"):
+    def _on_accent_selected(self, preset):
         self.theme_changed.emit(Theme(dark=self._t.dark, accent=preset))
 
 

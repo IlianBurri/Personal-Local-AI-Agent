@@ -187,7 +187,6 @@ class _TypingIndicator(QtWidgets.QWidget):
         self._opacity += self._dir
         if self._opacity >= 1.0 or self._opacity <= 0.3:
             self._dir *= -1
-        alpha = int(self._opacity * 255)
         color = self._t.accent.base
         self.dots.setStyleSheet(
             f"color: rgba({int(color[1:3], 16)}, {int(color[3:5], 16)}, {int(color[5:7], 16)}, {self._opacity}); "

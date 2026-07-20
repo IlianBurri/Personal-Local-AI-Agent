@@ -1,3 +1,3 @@
 """UI package for the AI Agent application."""
 
-__all__ = ["main"]
+__all__: list[str] = []
