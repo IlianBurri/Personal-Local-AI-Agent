@@ -186,5 +186,23 @@ class SQLiteManager:
             for row in cursor.fetchall()
         ]
 
+    def delete_last_assistant_message(self, chat_id):
+        """Delete the most recent assistant message for a given chat."""
+        cursor = self.conn.cursor()
+        cursor.execute(
+            """
+            DELETE FROM messages
+            WHERE id = (
+                SELECT id FROM messages
+                WHERE chat_id = ? AND role = 'assistant'
+                ORDER BY id DESC
+                LIMIT 1
+            )
+            """,
+            (chat_id,),
+        )
+        self.conn.commit()
+        return cursor.rowcount > 0
+
     def close(self):
         self.conn.close()

@@ -1,126 +1,210 @@
-from PyQt6 import QtWidgets, QtGui, QtCore
+from PyQt6 import QtCore, QtGui, QtWidgets
+
+from ui.theme import Theme
 
 
 class MessageWidget(QtWidgets.QWidget):
+    """Plain-text message row. No bubble on either side.
 
-    def __init__(self, role: str, content: str):
+    User message: right-aligned plain text.
+    Assistant message: left-aligned plain text.
+    Code blocks render as separate bordered widgets with a language header
+    and a copy button. Streaming tokens are appended to the *last* plain-text
+    label, which works correctly when only plain text is streaming.
+
+    Assistant messages show a "↻ Regenerate" button on hover.
+    """
+
+    regenerate_requested = QtCore.pyqtSignal(object)  # emits self
+
+    def __init__(self, role: str, content: str, theme: Theme):
         super().__init__()
         self.role = role
         self.content = content
-        self._setup()
+        self._t = theme
+        self._text_lbls: list[QtWidgets.QLabel] = []
+        self._regenerate_btn = None
+        self._can_regenerate = False
+        self._build()
 
-    def _setup(self):
-        outer = QtWidgets.QHBoxLayout(self)
-        outer.setContentsMargins(0, 0, 0, 0)
+    def _build(self):
+        outer = QtWidgets.QVBoxLayout(self)
+        outer.setContentsMargins(0, 16, 0, 16)
         outer.setSpacing(0)
 
-        bubble = QtWidgets.QFrame()
-        bubble.setMaximumWidth(720)
+        parts = self.content.split("```")
+        # Streaming always needs somewhere to land. If the message is empty
+        # or has no plain-text leading segment, allocate one label now so
+        # append_text has a target.
+        if len(parts) == 1 or parts[0] == "":
+            self._append_text_segment(outer, "")
 
-        bubble_layout = QtWidgets.QVBoxLayout(bubble)
-        bubble_layout.setContentsMargins(14, 10, 14, 10)
-        bubble_layout.setSpacing(6)
-
-        if "```" not in self.content:
-            self.lbl = QtWidgets.QLabel(self.content)
-            self.lbl.setWordWrap(True)
-            self.lbl.setTextInteractionFlags(
-                QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
-            )
-            self.lbl.setStyleSheet("font-size: 14px; line-height: 1.6;")
-            bubble_layout.addWidget(self.lbl)
-        else:
-            self.lbl = None
-            parts = self.content.split("```")
-            for i, part in enumerate(parts):
-                if i % 2 == 0:
-                    if part.strip():
-                        lbl = QtWidgets.QLabel(part.strip())
-                        lbl.setWordWrap(True)
-                        lbl.setTextInteractionFlags(
-                            QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
-                        )
-                        lbl.setStyleSheet("font-size: 14px;")
-                        bubble_layout.addWidget(lbl)
+        for i, part in enumerate(parts):
+            if i % 2 == 0:
+                if i == 0 and self._text_lbls:
+                    # The leading label was created as the streaming target above.
+                    if part:
+                        self._text_lbls[-1].setText(part)
+                    continue
+                text = part.strip() if part else ""
+                if not text:
+                    continue
+                self._append_text_segment(outer, text)
+            else:
+                block = CodeBlock(part, self._t)
+                row = QtWidgets.QHBoxLayout()
+                row.setContentsMargins(0, 4, 0, 4)
+                row.setSpacing(0)
+                if self.role == "user":
+                    row.addStretch()
+                    row.addWidget(block)
                 else:
-                    code_text = part
-                    if "\n" in part:
-                        _, code_text = part.split("\n", 1)
+                    row.addWidget(block)
+                    row.addStretch()
+                outer.addLayout(row)
 
-                    code = QtWidgets.QPlainTextEdit()
-                    code.setPlainText(code_text.rstrip())
-                    code.setReadOnly(True)
-                    font = QtGui.QFontDatabase.systemFont(
-                        QtGui.QFontDatabase.SystemFont.FixedFont
-                    )
-                    font.setPointSize(12)
-                    code.setFont(font)
-                    code.setMaximumHeight(220)
-                    code.setStyleSheet("""
-                        QPlainTextEdit {
-                            background: #0a0e14;
-                            color: #a5f3fc;
-                            border: 1px solid #1e293b;
-                            border-radius: 6px;
-                            padding: 10px;
-                            font-size: 12px;
-                        }
-                    """)
+        # Regenerate button — only for assistant messages, hidden by default
+        if self.role == "assistant":
+            btn_row = QtWidgets.QHBoxLayout()
+            btn_row.setContentsMargins(0, 4, 0, 0)
+            btn_row.setSpacing(0)
+            btn_row.addStretch()
+            self._regenerate_btn = QtWidgets.QPushButton("\u21bb Regenerate")
+            self._regenerate_btn.setCursor(
+                QtCore.Qt.CursorShape.PointingHandCursor
+            )
+            self._regenerate_btn.setToolTip("Regenerate this response")
+            self._regenerate_btn.clicked.connect(
+                lambda: self.regenerate_requested.emit(self)
+            )
+            self._regenerate_btn.hide()
+            btn_row.addWidget(self._regenerate_btn)
+            btn_row.addStretch()
+            outer.addLayout(btn_row)
 
-                    copy_btn = QtWidgets.QPushButton("Copy")
-                    copy_btn.setFixedSize(56, 26)
-                    copy_btn.setStyleSheet("""
-                        QPushButton {
-                            background: #1e293b;
-                            color: #94a3b8;
-                            border: none;
-                            border-radius: 4px;
-                            font-size: 11px;
-                            font-weight: 600;
-                        }
-                        QPushButton:hover {
-                            background: #334155;
-                            color: #f1f5f9;
-                        }
-                    """)
+        self.apply_theme(self._t)
 
-                    def make_copy(w=code):
-                        def _():
-                            QtWidgets.QApplication.clipboard().setText(
-                                w.toPlainText()
-                            )
-                        return _
-
-                    copy_btn.clicked.connect(make_copy())
-
-                    header = QtWidgets.QHBoxLayout()
-                    header.addStretch()
-                    header.addWidget(copy_btn)
-                    bubble_layout.addLayout(header)
-                    bubble_layout.addWidget(code)
-
+    def _append_text_segment(self, outer, text: str):
+        row = QtWidgets.QHBoxLayout()
+        row.setContentsMargins(0, 4, 0, 4)
+        row.setSpacing(0)
+        lbl = QtWidgets.QLabel(text)
+        lbl.setWordWrap(True)
+        lbl.setTextInteractionFlags(
+            QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
+            | QtCore.Qt.TextInteractionFlag.LinksAccessibleByMouse,
+        )
+        lbl.setOpenExternalLinks(True)
         if self.role == "user":
-            bubble.setStyleSheet("""
-                QFrame {
-                    background: #1d4ed8;
-                    border-radius: 16px 16px 4px 16px;
-                }
-                QLabel { color: #eff6ff; }
-            """)
-            outer.addStretch()
-            outer.addWidget(bubble)
+            row.addStretch()
+            row.addWidget(lbl)
         else:
-            bubble.setStyleSheet("""
-                QFrame {
-                    background: #1e293b;
-                    border-radius: 16px 16px 16px 4px;
-                    border: 1px solid #334155;
-                }
-                QLabel { color: #e2e8f0; }
-            """)
-            outer.addWidget(bubble)
-            outer.addStretch()
+            row.addWidget(lbl)
+            row.addStretch()
+        outer.addLayout(row)
+        self._text_lbls.append(lbl)
 
-    def append_text(self, tok: str):
-        if self.lbl is not None:
-            self.lbl.setText(self.lbl.text() + tok)
+    def apply_theme(self, theme: Theme):
+        self._t = theme
+        for lbl in self._text_lbls:
+            lbl.setStyleSheet(self._t.message_text_css(self.role))
+        if self._regenerate_btn:
+            self._regenerate_btn.setStyleSheet(self._t.regenerate_btn_css())
+        # Code blocks live inside row sub-layouts.
+        layout_item = self.layout()
+        if layout_item is not None:
+            for i in range(layout_item.count()):
+                item = layout_item.itemAt(i)
+                sub = item.layout() if item else None
+                if sub is None:
+                    continue
+                for j in range(sub.count()):
+                    inner = sub.itemAt(j)
+                    w = inner.widget() if inner else None
+                    if isinstance(w, CodeBlock):
+                        w.apply_theme(self._t)
+
+    def append_text(self, token: str):
+        """Append a streaming token to the trailing plain-text label."""
+        self.content += token
+        if not self._text_lbls:
+            return
+        last = self._text_lbls[-1]
+        last.setText(last.text() + token)
+
+    def set_can_regenerate(self, enabled: bool):
+        """Enable or disable the regenerate button for this message.
+        Only the last assistant message should have it.
+        """
+        self._can_regenerate = enabled
+        if self._regenerate_btn:
+            self._regenerate_btn.setVisible(enabled and bool(self.content.strip()))
+            self.setAttribute(
+                QtCore.Qt.WidgetAttribute.WA_Hover, enabled and bool(self.content.strip())
+            )
+
+    # -- hover events to show/hide regenerate button --
+    def enterEvent(self, event):
+        if self._regenerate_btn and self._can_regenerate and self.content.strip():
+            self._regenerate_btn.show()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        if self._regenerate_btn:
+            self._regenerate_btn.hide()
+        super().leaveEvent(event)
+
+
+class CodeBlock(QtWidgets.QWidget):
+    def __init__(self, raw: str, theme: Theme):
+        super().__init__()
+        self._t = theme
+        self.setObjectName("codeBlock")
+
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
+
+        # Header row: language label + copy button
+        header = QtWidgets.QHBoxLayout()
+        header.setContentsMargins(12, 6, 6, 6)
+        header.setSpacing(0)
+
+        lang = raw.split("\n", 1)[0].strip()
+        lang_lbl = QtWidgets.QLabel(lang or "code")
+        lang_lbl.setObjectName("codeLang")
+        header.addWidget(lang_lbl)
+        header.addStretch()
+
+        copy_btn = QtWidgets.QPushButton("Copy")
+        copy_btn.setObjectName("codeCopy")
+        copy_btn.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        copy_btn.clicked.connect(self._copy)
+        header.addWidget(copy_btn)
+        layout.addLayout(header)
+
+        # Body
+        body = raw
+        if "\n" in raw:
+            body = "\n".join(raw.split("\n")[1:])
+        body = body.strip("\n")
+
+        self.code = QtWidgets.QPlainTextEdit(body)
+        self.code.setReadOnly(True)
+        self.code.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.code.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.code.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.code.setMaximumHeight(300)
+        font = QtGui.QFont("Courier New" if QtCore.QSysInfo.productType() == "windows" else "Monospace")
+        font.setPointSize(11)
+        self.code.setFont(font)
+        layout.addWidget(self.code)
+
+        self.apply_theme(self._t)
+
+    def _copy(self):
+        QtWidgets.QApplication.clipboard().setText(self.code.toPlainText())
+
+    def apply_theme(self, theme: Theme):
+        self._t = theme
+        self.setStyleSheet(self._t.code_block_css())

@@ -1,5 +1,5 @@
 import types
-from core.clients import OpenAIClient, AnthropicClient, OllamaClient
+from core.providers import OpenAIClient, AnthropicClient, OllamaClient
 import requests
 
 
@@ -74,15 +74,15 @@ def test_ollama_streaming_and_list(monkeypatch):
     tags = oc.list_models()
     assert isinstance(tags, list)
 
-    # mock streaming post
+    # mock streaming post — response format matches /api/chat
     def fake_post(url, json=None, stream=True, timeout=60, headers=None):
         class R:
             def raise_for_status(self):
                 pass
 
             def iter_lines(self, decode_unicode=True):
-                yield '{"text":"stream1"}'
-                yield '{"text":"stream2"}'
+                yield '{"message": {"role": "assistant", "content": "Hello "}}'
+                yield '{"message": {"role": "assistant", "content": "world"}}'
 
             def __enter__(self):
                 return self
@@ -94,4 +94,4 @@ def test_ollama_streaming_and_list(monkeypatch):
 
     monkeypatch.setattr(requests, "post", fake_post)
     out = "".join([t for t in oc.stream_chat([{"role":"user","content":"hi"}])])
-    assert "stream1" in out
+    assert out == "Hello world"

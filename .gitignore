@@ -24,3 +24,4 @@ secrets.json
 
 # macOS
 .DS_Store
+.aider*

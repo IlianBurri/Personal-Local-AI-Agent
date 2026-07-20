@@ -68,10 +68,8 @@ class ChatRepository:
             content
         )
 
-    def get_chat_messages(
-        self,
-        chat_id
-    ):
-        return self.db.get_messages(
-            chat_id
-        )
+    def get_chat_messages(self, chat_id):
+        return self.db.get_messages(chat_id)
+
+    def delete_last_assistant_message(self, chat_id):
+        return self.db.delete_last_assistant_message(chat_id)
