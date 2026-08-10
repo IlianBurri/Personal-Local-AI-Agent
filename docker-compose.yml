@@ -1,0 +1,24 @@
+services:
+  arca:
+    build: .
+    image: arca:latest
+    container_name: arca
+    ports:
+      - "8765:8765"
+    environment:
+      ARCA_HOST: 0.0.0.0
+      # Point Arca at an Ollama running on the host machine:
+      # ARCA_OLLAMA_URL: http://host.docker.internal:11434
+      # Optional API keys (can also be set in the Settings panel):
+      # OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      # ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - arca-data:/app/data                    # chat history (SQLite)
+      - arca-config:/home/arca/.config/arca    # settings & API keys
+    extra_hosts:
+      - "host.docker.internal:host-gateway"    # lets the container reach host services
+    restart: unless-stopped
+
+volumes:
+  arca-data:
+  arca-config:

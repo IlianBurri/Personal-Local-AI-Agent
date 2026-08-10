@@ -1,6 +1,9 @@
 __pycache__/
 dist/
 build/
+ui/web/node_modules/
+!ui/web/dist/
+!ui/web/dist/**
 *.pyc
 *.pyo
 *.pyd
@@ -8,9 +11,7 @@ env/
 venv/
 .venv/
 *.egg-info/
-dist/
 release/
-dist/
 *.spec
 *.log
 *.sqlite3
@@ -20,7 +21,7 @@ secrets.json
 
 # PyInstaller
 *.manifest
-*.spec
+!arca.spec
 
 # macOS
 .DS_Store

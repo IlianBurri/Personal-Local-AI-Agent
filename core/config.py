@@ -20,12 +20,34 @@ DEFAULT_CONFIG = {
     "generation": {
         "temperature": 0.7,
         "max_tokens": 1024,
+        "enable_tools": True,
+        "allow_shell": False,
+        "system_prompt": "",
+        "max_tool_rounds": 10,
     },
-    "web": {
-        "password_salt": None,
-        "password_hash": None,
+    "ui": {
+        "dark": True,
+        "accent": "mint",
+        "font_size": 14,
+        "chat_width": 740,
+        "app_name": "Arca",
+        "tagline": "Your models. Your machine. Your rules.",
+        "suggestions": [
+            "Explain a concept",
+            "Write some code",
+            "Summarize text",
+            "Draft an email",
+            "Translate this",
+            "Plan a project",
+            "Debug my code",
+            "Write a poem",
+        ],
     },
 }
+
+DEFAULT_SUGGESTIONS = list(DEFAULT_CONFIG["ui"]["suggestions"])
+DEFAULT_TAGLINE = DEFAULT_CONFIG["ui"]["tagline"]
+DEFAULT_APP_NAME = DEFAULT_CONFIG["ui"]["app_name"]
 
 
 def ensure_config_path() -> Path:
@@ -44,6 +66,12 @@ def load_config() -> dict:
         providers = data.setdefault("providers", {})
         for name in DEFAULT_CONFIG["providers"]:
             providers.setdefault(name, {})
+        gen = data.setdefault("generation", {})
+        for key, value in DEFAULT_CONFIG["generation"].items():
+            gen.setdefault(key, value)
+        ui = data.setdefault("ui", {})
+        for key, value in DEFAULT_CONFIG["ui"].items():
+            ui.setdefault(key, value)
         return data
     except Exception:
         return json.loads(json.dumps(DEFAULT_CONFIG))
@@ -124,7 +152,60 @@ def set_max_tokens(config: dict, value: int) -> None:
     save_config(config)
 
 
+def get_enable_tools(config: dict) -> bool:
+    gen = config.get("generation", {}) or {}
+    return bool(gen.get("enable_tools", True))
+
+
+def set_enable_tools(config: dict, value: bool) -> None:
+    gen = config.setdefault("generation", {})
+    gen["enable_tools"] = bool(value)
+    save_config(config)
+
+
+def get_allow_shell(config: dict) -> bool:
+    gen = config.get("generation", {}) or {}
+    return bool(gen.get("allow_shell", False))
+
+
+def set_allow_shell(config: dict, value: bool) -> None:
+    gen = config.setdefault("generation", {})
+    gen["allow_shell"] = bool(value)
+    save_config(config)
+
+
+def get_system_prompt(config: dict) -> str:
+    gen = config.get("generation", {}) or {}
+    return str(gen.get("system_prompt", "") or "").strip()
+
+
+def set_system_prompt(config: dict, value: str) -> None:
+    gen = config.setdefault("generation", {})
+    gen["system_prompt"] = (value or "").strip()[:4000]
+    save_config(config)
+
+
+def get_max_tool_rounds(config: dict) -> int:
+    gen = config.get("generation", {}) or {}
+    value = gen.get("max_tool_rounds")
+    if value is None:
+        return 10
+    try:
+        return max(1, min(50, int(value)))
+    except (TypeError, ValueError):
+        return 10
+
+
+def set_max_tool_rounds(config: dict, value: int) -> None:
+    gen = config.setdefault("generation", {})
+    gen["max_tool_rounds"] = max(1, min(50, int(value)))
+    save_config(config)
+
+
 def get_ollama_base_url(config: dict) -> str:
+    env_url = os.environ.get("ARCA_OLLAMA_URL")
+    if env_url:
+        return env_url.rstrip("/")
     bucket = config.get("providers", {}).get("ollama", {}) or {}
     return bucket.get("base_url", "http://localhost:11434")
 
